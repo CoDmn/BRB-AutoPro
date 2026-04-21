@@ -261,7 +261,7 @@ export default function BuySell() {
                             <img src={car.img} alt={car.name || `${car.brand} ${car.model}`} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" referrerPolicy="no-referrer" />
                           )}
                           <div className="absolute top-4 right-4 bg-primary text-white px-3 py-1 text-xs font-bold uppercase shadow-lg">
-                            {car.price}
+                            {car.price}€
                           </div>
                         </div>
                         <div className="p-6">

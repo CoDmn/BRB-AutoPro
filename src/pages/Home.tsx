@@ -68,13 +68,18 @@ export default function Home() {
         <div className="container mx-auto px-4 h-full">
           <div className="grid grid-cols-1 md:grid-cols-3 w-full py-6 md:py-0">
             <div className="text-center py-4 md:py-0 md:border-r border-white/20 flex flex-col justify-center">
-              <span className="text-[32px] font-sans font-black text-white block">1,250+</span>
-              <span className="text-[11px] text-white/90 uppercase font-semibold">Véhicules Livrés</span>
+              <span className="text-[24px] md:text-[28px] font-sans font-black text-white block uppercase">100% des clients</span>
+              <span className="text-[11px] text-white/90 uppercase font-semibold text-center w-full">Satisfaits</span>
             </div>
-            <div className="text-center py-4 md:py-0 md:border-r border-white/20 flex flex-col justify-center">
-              <span className="text-[32px] font-sans font-black text-white block">4.9/5</span>
-              <span className="text-[11px] text-white/90 uppercase font-semibold">Avis Google Clients</span>
-            </div>
+            <a 
+              href="https://maps.app.goo.gl/ZiKWnASSyADMPSHj8" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-center py-4 md:py-0 md:border-r border-white/20 flex flex-col justify-center hover:bg-white/10 transition-colors cursor-pointer group"
+            >
+              <span className="text-[32px] font-sans font-black text-white block group-hover:scale-105 transition-transform">5/5</span>
+              <span className="text-[11px] text-white/90 uppercase font-semibold underline underline-offset-4 decoration-white/30 decoration-1">Avis Google Clients</span>
+            </a>
             <div className="text-center py-4 md:py-0 flex flex-col justify-center">
               <span className="text-[32px] font-sans font-black text-white block">15 ans</span>
               <span className="text-[11px] text-white/90 uppercase font-semibold">D'Expertise Automobile</span>
@@ -135,7 +140,7 @@ export default function Home() {
                       referrerPolicy="no-referrer" 
                     />
                     <div className="absolute top-4 right-4 bg-primary text-white px-3 py-1 text-xs font-bold uppercase">
-                      {car.price}
+                      {car.price}€
                     </div>
                   </div>
                   <div className="p-6">

@@ -527,7 +527,7 @@ export default function Admin() {
                     </div>
                     <div className="flex-1 overflow-hidden">
                       <h3 className="font-bold text-sm uppercase truncate">{car.brand} {car.model}</h3>
-                      <p className="text-xs text-white/50">{car.price} • {car.km} • {car.year}</p>
+                      <p className="text-xs text-white/50">{car.price}€ • {car.km} • {car.year}</p>
                     </div>
                     <div className="flex items-center gap-2">
                       <button 

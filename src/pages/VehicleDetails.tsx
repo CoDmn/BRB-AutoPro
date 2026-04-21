@@ -129,6 +129,41 @@ export default function VehicleDetails() {
               </div>
             </div>
 
+            {/* Technical Specs Details */}
+            <div className="bg-darker p-8 md:p-10 rounded border border-white/5">
+              <h2 className="text-2xl font-sans font-black uppercase text-white mb-8 border-l-4 border-primary pl-4">
+                Fiche Technique
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-6">
+                {[
+                  { label: "Marque", value: vehicle.brand },
+                  { label: "Modèle", value: vehicle.model },
+                  { label: "Type", value: vehicle.type },
+                  { label: "Année", value: vehicle.year },
+                  { label: "Kilométrage", value: vehicle.km },
+                  { label: "Carburant", value: vehicle.fuel },
+                  { label: "Boîte de vitesse", value: vehicle.gearbox },
+                  { label: "Couleur", value: vehicle.color },
+                  { label: "Nombre de portes", value: vehicle.doors },
+                  { label: "Nombre de places", value: vehicle.seats },
+                  { label: "Crit'air", value: vehicle.critair },
+                  { label: "Puissance fiscale (CV)", value: vehicle.cv },
+                  { label: "Puissance DIN (ch)", value: vehicle.ch },
+                ].map((spec, i) => (
+                  <div key={i} className="flex justify-between border-b border-white/5 pb-2">
+                    <span className="text-[11px] uppercase font-bold text-white/40 tracking-wider">{spec.label}</span>
+                    <span className="text-sm font-bold text-white">{spec.value || "-"}</span>
+                  </div>
+                ))}
+              </div>
+              {vehicle.specificities && (
+                <div className="mt-12 bg-anthracite p-6 rounded border border-white/5">
+                  <h4 className="text-[11px] uppercase font-black text-primary tracking-widest mb-4">Équipements & Options</h4>
+                  <p className="text-sm text-white/80 leading-relaxed font-sans">{vehicle.specificities}</p>
+                </div>
+              )}
+            </div>
+
             {/* Detailed Description */}
             <div className="bg-darker p-8 md:p-10 rounded border border-white/5">
               <h2 className="text-2xl font-sans font-black uppercase text-white mb-6 border-l-4 border-primary pl-4">
@@ -179,7 +214,7 @@ export default function VehicleDetails() {
                 <Euro className="w-8 h-8 text-primary" />
                 <div>
                   <span className="text-[10px] uppercase font-black text-white/30 block tracking-[2px]">Prix de vente</span>
-                  <span className="text-3xl text-white font-black">{vehicle.price}</span>
+                  <span className="text-3xl text-white font-black">{vehicle.price}€</span>
                 </div>
               </div>
 
