@@ -1,19 +1,94 @@
-import React, { useState } from "react";
-import { Filter, Search, ShieldCheck } from "lucide-react";
+import React, { useState, useEffect, useMemo } from "react";
+import { Filter, Search, ShieldCheck, ChevronDown, ChevronUp } from "lucide-react";
 import { Link } from "react-router-dom";
 import { submitEstimationRequest } from "../lib/firebaseUtils";
-
-const INVENTORY = [
-  { id: 1, name: "Porsche 911 (992) Carrera S", price: "135 000 â‚¬", year: "2020", km: "35 000 km", fuel: "Essence", gearbox: "Auto", img: "https://images.unsplash.com/photo-1503376713251-4045fbc555fa?q=80&w=800&auto=format&fit=crop" },
-  { id: 2, name: "BMW M4 Competition (G82)", price: "85 000 â‚¬", year: "2021", km: "22 000 km", fuel: "Essence", gearbox: "Auto", img: "https://images.unsplash.com/photo-1617814076367-b7713d230e15?q=80&w=800&auto=format&fit=crop" },
-  { id: 3, name: "Audi RS6 Avant (C8)", price: "128 000 â‚¬", year: "2022", km: "15 000 km", fuel: "Essence", gearbox: "Auto", img: "https://images.unsplash.com/photo-1603525281486-3ddebbc65476?q=80&w=800&auto=format&fit=crop" },
-  { id: 4, name: "Mercedes-Benz Classe G 63 AMG", price: "185 000 â‚¬", year: "2021", km: "40 000 km", fuel: "Essence", gearbox: "Auto", img: "https://images.unsplash.com/photo-1520031441872-265e4ff70366?q=80&w=800&auto=format&fit=crop" },
-];
+import { db } from "../lib/firebase";
+import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
 
 export default function BuySell() {
   const [activeTab, setActiveTab] = useState<"buy" | "sell">("buy");
   const [sellForm, setSellForm] = useState({ brand: "", model: "", year: "", km: "", email: "" });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [inventory, setInventory] = useState<any[]>([]);
+
+  // Filter States
+  const [filters, setFilters] = useState({
+    brand: "Toutes les marques",
+    budgetMin: "",
+    budgetMax: "",
+    yearMin: "",
+    yearMax: "",
+    kmMin: "",
+    kmMax: "",
+    gearboxAuto: true,
+    gearboxManual: true,
+    fuel: "Tous",
+    doors: "",
+    type: ""
+  });
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
+  useEffect(() => {
+    const q = query(collection(db, "inventory"), orderBy("createdAt", "desc"));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setInventory(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Compute unique brands from current inventory for the dropdown
+  const uniqueBrands = useMemo(() => {
+    const brands = inventory.map(car => car.brand).filter(Boolean);
+    return Array.from(new Set(brands)).sort();
+  }, [inventory]);
+
+  // Handle Input Changes for Filters
+  const handleFilterChange = (field: string, value: any) => {
+    setFilters(prev => ({ ...prev, [field]: value }));
+  };
+
+  // Compute filtered inventory
+  const filteredInventory = useMemo(() => {
+    return inventory.filter(car => {
+      // Brand
+      if (filters.brand !== "Toutes les marques" && car.brand !== filters.brand) return false;
+      
+      // Price (removing spaces and €)
+      const price = parseInt(String(car.price || "0").replace(/\D/g, "")) || 0;
+      if (filters.budgetMin && price < parseInt(filters.budgetMin)) return false;
+      if (filters.budgetMax && price > parseInt(filters.budgetMax)) return false;
+
+      // Year
+      const year = parseInt(car.year) || 0;
+      if (filters.yearMin && year < parseInt(filters.yearMin)) return false;
+      if (filters.yearMax && year > parseInt(filters.yearMax)) return false;
+
+      // KM
+      const km = parseInt(String(car.km || "0").replace(/\D/g, "")) || 0;
+      if (filters.kmMin && km < parseInt(filters.kmMin)) return false;
+      if (filters.kmMax && km > parseInt(filters.kmMax)) return false;
+
+      // Gearbox
+      const isAuto = car.gearbox?.toLowerCase().includes("auto");
+      const isManual = car.gearbox?.toLowerCase().includes("manuel");
+      // If neither filter is checked, don't show the respective cars
+      if (!filters.gearboxAuto && isAuto) return false;
+      if (!filters.gearboxManual && isManual) return false;
+
+      // Advanced Filters
+      const carFuel = car.fuel?.toLowerCase() || "";
+      if (filters.fuel !== "Tous") {
+        if (!carFuel.includes(filters.fuel.toLowerCase())) return false;
+      }
+      
+      const carType = car.type?.toLowerCase() || "";
+      if (filters.type && !carType.includes(filters.type.toLowerCase())) return false;
+
+      if (filters.doors && car.doors !== filters.doors) return false;
+
+      return true;
+    });
+  }, [inventory, filters]);
 
   const handleSellSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,53 +143,143 @@ export default function BuySell() {
               <div className="space-y-6">
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-[1px] text-white/50 mb-2">Marque</label>
-                  <select className="w-full p-3 bg-anthracite border border-white/10 text-white text-sm focus:outline-none focus:border-primary">
+                  <select 
+                    className="w-full p-3 bg-anthracite border border-white/10 text-white text-sm focus:outline-none focus:border-primary"
+                    value={filters.brand}
+                    onChange={(e) => handleFilterChange('brand', e.target.value)}
+                  >
                     <option>Toutes les marques</option>
-                    <option>Porsche</option>
-                    <option>BMW</option>
-                    <option>Audi</option>
-                    <option>Mercedes-Benz</option>
+                    {uniqueBrands.map(brand => (
+                      <option key={brand} value={brand}>{brand}</option>
+                    ))}
                   </select>
                 </div>
+                
                 <div>
-                  <label className="block text-xs font-bold uppercase tracking-[1px] text-white/50 mb-2">Budget Min / Max</label>
-                  <div className="flex gap-2">
-                    <input type="number" placeholder="Min" className="w-1/2 p-3 bg-anthracite border border-white/10 text-white text-sm focus:outline-none focus:border-primary" />
-                    <input type="number" placeholder="Max" className="w-1/2 p-3 bg-anthracite border border-white/10 text-white text-sm focus:outline-none focus:border-primary" />
+                  <label className="block text-xs font-bold uppercase tracking-[1px] text-white/50 mb-2">Budget Max</label>
+                  <div className="flex gap-2 text-white items-center">
+                    <input type="range" min="0" max="300000" step="5000" 
+                      value={filters.budgetMax || "300000"} 
+                      onChange={(e) => handleFilterChange('budgetMax', e.target.value)} 
+                      className="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-primary" 
+                    />
+                    <span className="text-xs font-bold min-w-[60px] text-right">{filters.budgetMax ? `${filters.budgetMax}€` : 'Max'}</span>
                   </div>
                 </div>
-                <button className="w-full bg-primary text-white py-3 font-bold uppercase tracking-[1px] text-xs hover:bg-primary-hover transition-colors flex justify-center items-center gap-2 rounded">
-                  <Search className="w-4 h-4" /> Rechercher
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-[1px] text-white/50 mb-2">Année Min / Max</label>
+                  <div className="flex gap-2">
+                    <input type="number" placeholder="De" value={filters.yearMin} onChange={(e) => handleFilterChange('yearMin', e.target.value)} className="w-1/2 p-3 bg-anthracite border border-white/10 text-white text-sm focus:outline-none focus:border-primary" />
+                    <input type="number" placeholder="À" value={filters.yearMax} onChange={(e) => handleFilterChange('yearMax', e.target.value)} className="w-1/2 p-3 bg-anthracite border border-white/10 text-white text-sm focus:outline-none focus:border-primary" />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-[1px] text-white/50 mb-2">Kilométrage Min / Max</label>
+                  <div className="flex gap-2">
+                    <input type="number" placeholder="De" value={filters.kmMin} onChange={(e) => handleFilterChange('kmMin', e.target.value)} className="w-1/2 p-3 bg-anthracite border border-white/10 text-white text-sm focus:outline-none focus:border-primary" />
+                    <input type="number" placeholder="À" value={filters.kmMax} onChange={(e) => handleFilterChange('kmMax', e.target.value)} className="w-1/2 p-3 bg-anthracite border border-white/10 text-white text-sm focus:outline-none focus:border-primary" />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-[1px] text-white/50 mb-2">Boîte de vitesse</label>
+                  <div className="flex gap-4 text-white text-sm">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" checked={filters.gearboxAuto} onChange={(e) => handleFilterChange('gearboxAuto', e.target.checked)} className="accent-primary w-4 h-4" />
+                      Auto
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" checked={filters.gearboxManual} onChange={(e) => handleFilterChange('gearboxManual', e.target.checked)} className="accent-primary w-4 h-4" />
+                      Manuelle
+                    </label>
+                  </div>
+                </div>
+
+                <div className="border-t border-white/10 pt-4">
+                  <button 
+                    onClick={() => setShowAdvanced(!showAdvanced)} 
+                    className="w-full flex justify-between items-center text-xs font-bold uppercase tracking-[1px] text-white/70 hover:text-white transition-colors"
+                  >
+                    Filtres avancés
+                    {showAdvanced ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                  </button>
+                  
+                  {showAdvanced && (
+                    <div className="mt-4 space-y-4 animate-fade-in">
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-[1px] text-white/50 mb-2">Carburant</label>
+                        <select 
+                          value={filters.fuel} onChange={(e) => handleFilterChange('fuel', e.target.value)}
+                          className="w-full p-2 bg-anthracite border border-white/10 text-white text-sm focus:outline-none focus:border-primary"
+                        >
+                          <option>Tous</option>
+                          <option>Essence</option>
+                          <option>Diesel</option>
+                          <option>Hybride</option>
+                          <option>Électrique</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-[1px] text-white/50 mb-2">Type (ex: SUV, Coupé)</label>
+                        <input type="text" placeholder="Tous" value={filters.type} onChange={(e) => handleFilterChange('type', e.target.value)} className="w-full p-2 bg-anthracite border border-white/10 text-white text-sm focus:outline-none focus:border-primary" />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-[1px] text-white/50 mb-2">Nombre de portes</label>
+                        <input type="number" placeholder="Peu importe" value={filters.doors} onChange={(e) => handleFilterChange('doors', e.target.value)} className="w-full p-2 bg-anthracite border border-white/10 text-white text-sm focus:outline-none focus:border-primary" />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <button 
+                  onClick={() => setFilters({
+                    brand: "Toutes les marques", budgetMin: "", budgetMax: "", yearMin: "", yearMax: "", kmMin: "", kmMax: "", gearboxAuto: true, gearboxManual: true, fuel: "Tous", doors: "", type: ""
+                  })} 
+                  className="w-full bg-transparent border border-white/10 text-white/50 py-3 font-bold uppercase tracking-[1px] text-[10px] hover:bg-white/5 hover:text-white transition-colors flex justify-center items-center gap-2 rounded mt-4"
+                >
+                  Réinitialiser les filtres
                 </button>
               </div>
             </div>
 
             {/* Inventory Grid */}
             <div className="w-full lg:w-3/4">
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {INVENTORY.map((car) => (
-                    <div key={car.id} className="bg-darker group overflow-hidden border border-white/10 shadow-sm hover:border-primary transition-all duration-300 rounded">
-                      <div className="relative h-60 overflow-hidden bg-anthracite">
-                        <img src={car.img} alt={car.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" referrerPolicy="no-referrer" />
-                        <div className="absolute top-4 right-4 bg-primary text-white px-3 py-1 text-xs font-bold uppercase shadow-lg">
-                          {car.price}
+               {filteredInventory.length === 0 ? (
+                 <div className="bg-darker p-8 border border-white/5 rounded text-center text-white/50">
+                    Aucun véhicule disponible en stock pour le moment.
+                 </div>
+               ) : (
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {filteredInventory.map((car) => (
+                      <div key={car.id} className="bg-darker group overflow-hidden border border-white/10 shadow-sm hover:border-primary transition-all duration-300 rounded flex flex-col">
+                        <div className="relative h-60 overflow-hidden bg-anthracite">
+                          {car.images && car.images[0] ? (
+                            <img src={car.images[0]} alt={car.name || `${car.brand} ${car.model}`} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" referrerPolicy="no-referrer" />
+                          ) : (
+                            <img src={car.img} alt={car.name || `${car.brand} ${car.model}`} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" referrerPolicy="no-referrer" />
+                          )}
+                          <div className="absolute top-4 right-4 bg-primary text-white px-3 py-1 text-xs font-bold uppercase shadow-lg">
+                            {car.price}
+                          </div>
+                        </div>
+                        <div className="p-6">
+                          <h3 className="font-sans font-bold text-base uppercase mb-4 h-12 overflow-hidden text-white">{car.name || `${car.brand} ${car.model}`}</h3>
+                          <div className="grid grid-cols-2 gap-y-2 text-xs text-white/50 uppercase tracking-[1px] mb-6 flex-1">
+                            <p>Année: <span className="font-bold text-white">{car.year}</span></p>
+                            <p>KM: <span className="font-bold text-white">{car.km}</span></p>
+                            <p>Carbu: <span className="font-bold text-white">{car.fuel}</span></p>
+                            <p>Boîte: <span className="font-bold text-white">{car.gearbox}</span></p>
+                          </div>
+                          <Link to="/contact" className="block w-full text-center border border-white/10 text-white hover:bg-white/5 py-3 font-bold uppercase text-xs transition-colors rounded mt-auto">
+                            Plus de détails
+                          </Link>
                         </div>
                       </div>
-                      <div className="p-6">
-                        <h3 className="font-sans font-bold text-base uppercase mb-4 h-12 overflow-hidden text-white">{car.name}</h3>
-                        <div className="grid grid-cols-2 gap-y-2 text-xs text-white/50 uppercase tracking-[1px] mb-6">
-                          <p>Année: <span className="font-bold text-white">{car.year}</span></p>
-                          <p>KM: <span className="font-bold text-white">{car.km}</span></p>
-                          <p>Carbu: <span className="font-bold text-white">{car.fuel}</span></p>
-                          <p>Boîte: <span className="font-bold text-white">{car.gearbox}</span></p>
-                        </div>
-                        <Link to="/contact" className="block w-full text-center border-2 border-primary text-white hover:bg-primary py-3 font-bold uppercase text-xs transition-colors rounded">
-                          Voir Détails
-                        </Link>
-                      </div>
-                    </div>
-                  ))}
-               </div>
+                    ))}
+                 </div>
+               )}
             </div>
           </div>
         )}

@@ -1,8 +1,19 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Sparkles, Droplets, Shield, ChevronRight, CheckCircle2 } from "lucide-react";
+import { db } from "../lib/firebase";
+import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
 
 export default function Detailing() {
   const [activeTab, setActiveTab] = useState("ceramic");
+  const [gallery, setGallery] = useState<any[]>([]);
+
+  useEffect(() => {
+    const q = query(collection(db, "detailingGalleries"), orderBy("createdAt", "desc"));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setGallery(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    return () => unsubscribe();
+  }, []);
 
   return (
     <div className="bg-anthracite min-h-screen">
@@ -156,7 +167,7 @@ export default function Detailing() {
         </div>
       </section>
 
-      {/* Galerie Avant / Après (Placeholder interactif) */}
+      {/* Galerie Avant / Après */}
       <section className="py-24 bg-darker text-white border-t border-white/10">
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-3xl md:text-5xl font-sans font-black uppercase text-white mb-4">
@@ -164,17 +175,26 @@ export default function Detailing() {
           </h2>
           <div className="w-24 h-1 bg-primary mx-auto mb-16"></div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
-            <div className="bg-anthracite border border-white/5 p-2 rounded">
-              <img src="https://images.unsplash.com/photo-1601362840469-51e4d8d58785?q=80&w=800&auto=format&fit=crop" className="w-full h-64 object-cover mb-2 opacity-50 grayscale" alt="Avant" referrerPolicy="no-referrer" loading="lazy" />
-              <p className="uppercase tracking-wider font-bold text-xs text-white/50 pt-2 pb-1">Avant : Micro-rayures (Hologrammes)</p>
+          {gallery.length === 0 ? (
+            <div className="bg-anthracite border border-white/5 py-12 rounded text-white/50">
+              Aucune réalisation partagée pour le moment.
             </div>
-            <div className="bg-anthracite border border-white/5 p-2 rounded">
-              <img src="https://images.unsplash.com/photo-1601362840469-51e4d8d58785?q=80&w=800&auto=format&fit=crop" className="w-full h-64 object-cover mb-2" alt="Après" referrerPolicy="no-referrer" loading="lazy" />
-              <p className="uppercase tracking-wider font-bold text-xs text-primary pt-2 pb-1">Après : Polissage + Céramique</p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-12 max-w-5xl mx-auto">
+              {gallery.map(item => (
+                <div key={item.id} className="grid grid-cols-2 gap-2 text-left">
+                  <div className="bg-anthracite border border-white/5 p-2 rounded">
+                    <img src={item.beforeImg} className="w-full h-48 md:h-64 object-cover mb-2" alt="Avant" referrerPolicy="no-referrer" loading="lazy" />
+                    <p className="uppercase tracking-wider font-bold text-[10px] text-white/50 pt-2 pb-1">Avant <br/><span className="font-normal text-xs normal-case">{item.beforeDesc}</span></p>
+                  </div>
+                  <div className="bg-anthracite border border-white/5 p-2 rounded">
+                    <img src={item.afterImg} className="w-full h-48 md:h-64 object-cover mb-2" alt="Après" referrerPolicy="no-referrer" loading="lazy" />
+                    <p className="uppercase tracking-wider font-bold text-[10px] text-primary pt-2 pb-1">Après <br/><span className="font-normal text-xs normal-case text-white">{item.afterDesc}</span></p>
+                  </div>
+                </div>
+              ))}
             </div>
-          </div>
-          <p className="mt-8 text-white/50 font-light text-[11px] uppercase tracking-wider">* Les images sont données à titre d'illustration.</p>
+          )}
         </div>
       </section>
     </div>
