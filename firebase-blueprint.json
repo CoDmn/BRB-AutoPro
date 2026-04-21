@@ -52,31 +52,68 @@
       "description": "A vehicle available in stock.",
       "type": "object",
       "properties": {
-        "name": { "type": "string", "maxLength": 150 },
+        "brand": { "type": "string", "maxLength": 100 },
+        "model": { "type": "string", "maxLength": 100 },
+        "name": { "type": "string", "maxLength": 200 },
         "price": { "type": "string", "maxLength": 50 },
         "year": { "type": "string", "maxLength": 10 },
         "km": { "type": "string", "maxLength": 20 },
         "fuel": { "type": "string", "maxLength": 50 },
         "gearbox": { "type": "string", "maxLength": 50 },
-        "img": { "type": "string", "maxLength": 500 },
+        "doors": { "type": "string", "maxLength": 10 },
+        "seats": { "type": "string", "maxLength": 10 },
+        "type": { "type": "string", "maxLength": 50 },
+        "color": { "type": "string", "maxLength": 50 },
+        "critair": { "type": "string", "maxLength": 10 },
+        "cv": { "type": "string", "maxLength": 10 },
+        "ch": { "type": "string", "maxLength": 10 },
+        "specificities": { "type": "string", "maxLength": 2000 },
+        "details": { "type": "string", "maxLength": 20000 },
+        "img": { "type": "string", "maxLength": 1000 },
+        "images": { 
+          "type": "array", 
+          "items": { "type": "string" },
+          "maxItems": 4
+        },
+        "isFavorite": { "type": "boolean" },
         "createdAt": { "type": "timestamp" },
         "updatedAt": { "type": "timestamp" }
       },
-      "required": ["name", "price", "year", "km", "fuel", "gearbox", "img", "createdAt", "updatedAt"]
+      "required": ["brand", "model", "name", "price", "year", "km", "fuel", "gearbox", "img", "images", "createdAt", "updatedAt"]
     },
     "DetailingGallery": {
       "title": "DetailingGallery",
       "description": "Before/After pictures for detailing.",
       "type": "object",
       "properties": {
-        "beforeImg": { "type": "string", "maxLength": 500 },
-        "afterImg": { "type": "string", "maxLength": 500 },
-        "beforeDesc": { "type": "string", "maxLength": 200 },
-        "afterDesc": { "type": "string", "maxLength": 200 },
+        "beforeImg": { "type": "string", "maxLength": 1048576 },
+        "afterImg": { "type": "string", "maxLength": 1048576 },
+        "beforeDesc": { "type": "string", "maxLength": 5000 },
+        "afterDesc": { "type": "string", "maxLength": 5000 },
+        "isFavorite": { "type": "boolean" },
         "createdAt": { "type": "timestamp" },
         "updatedAt": { "type": "timestamp" }
       },
       "required": ["beforeImg", "afterImg", "beforeDesc", "afterDesc", "createdAt", "updatedAt"]
+    },
+    "Booking": {
+      "title": "Booking",
+      "description": "An appointment booking.",
+      "type": "object",
+      "properties": {
+        "firstName": { "type": "string", "maxLength": 100 },
+        "lastName": { "type": "string", "maxLength": 100 },
+        "phone": { "type": "string", "maxLength": 20 },
+        "email": { "type": "string", "format": "email", "maxLength": 100 },
+        "carModel": { "type": "string", "maxLength": 200 },
+        "date": { "type": "string", "format": "date-time" },
+        "service": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "accepted", "refused"] },
+        "message": { "type": "string" },
+        "createdAt": { "type": "timestamp" },
+        "updatedAt": { "type": "timestamp" }
+      },
+      "required": ["firstName", "lastName", "phone", "email", "carModel", "date", "status", "createdAt", "updatedAt"]
     },
     "Admin": {
       "title": "Admin",
@@ -113,6 +150,10 @@
     "admins/{userId}": {
       "schema": "Admin",
       "description": "Stores authorized admin users"
+    },
+    "bookings/{bookingId}": {
+      "schema": "Booking",
+      "description": "Stores appointment bookings"
     }
   }
 }

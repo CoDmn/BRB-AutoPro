@@ -272,7 +272,7 @@ export default function BuySell() {
                             <p>Carbu: <span className="font-bold text-white">{car.fuel}</span></p>
                             <p>Boîte: <span className="font-bold text-white">{car.gearbox}</span></p>
                           </div>
-                          <Link to="/contact" className="block w-full text-center border border-white/10 text-white hover:bg-white/5 py-3 font-bold uppercase text-xs transition-colors rounded mt-auto">
+                          <Link to={`/vehicle/${car.id}`} className="block w-full text-center border border-white/10 text-white hover:bg-white/5 py-3 font-bold uppercase text-xs transition-colors rounded mt-auto">
                             Plus de détails
                           </Link>
                         </div>

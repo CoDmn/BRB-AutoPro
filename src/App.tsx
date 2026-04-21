@@ -11,6 +11,8 @@ import BuySell from "./pages/BuySell";
 import Detailing from "./pages/Detailing";
 import Contact from "./pages/Contact";
 import Admin from "./pages/Admin";
+import Booking from "./pages/Booking";
+import VehicleDetails from "./pages/VehicleDetails";
 
 export default function App() {
   return (
@@ -25,6 +27,8 @@ export default function App() {
               <Route path="/buy-sell" element={<BuySell />} />
               <Route path="/detailing" element={<Detailing />} />
               <Route path="/contact" element={<Contact />} />
+              <Route path="/booking" element={<Booking />} />
+              <Route path="/vehicle/:id" element={<VehicleDetails />} />
             </Routes>
           </Layout>
         } />

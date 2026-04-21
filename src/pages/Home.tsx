@@ -1,7 +1,38 @@
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, CheckCircle2, Star, Shield, CarFront, Sparkles } from "lucide-react";
+import { db } from '../lib/firebase';
+import { collection, query, where, onSnapshot, limit } from 'firebase/firestore';
 
 export default function Home() {
+  const [favorites, setFavorites] = useState<any[]>([]);
+  const [galleryFavorites, setGalleryFavorites] = useState<any[]>([]);
+
+  useEffect(() => {
+    const qInv = query(
+      collection(db, 'inventory'), 
+      where('isFavorite', '==', true),
+      limit(3)
+    );
+    const unInv = onSnapshot(qInv, (snap) => {
+      setFavorites(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+
+    const qGal = query(
+      collection(db, 'detailingGalleries'),
+      where('isFavorite', '==', true),
+      limit(2)
+    );
+    const unGal = onSnapshot(qGal, (snap) => {
+      setGalleryFavorites(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+
+    return () => {
+      unInv();
+      unGal();
+    };
+  }, []);
+
   return (
     <div className="flex flex-col min-h-screen">
       {/* Hero Section */}
@@ -15,7 +46,7 @@ export default function Home() {
               Passion & Excellence
             </span>
             <h1 className="text-[40px] md:text-[52px] font-sans font-black text-white uppercase mb-6 leading-[1.1]">
-              L'EXPERTISE AUTOMOBILE SUR-MESURE À NÎMES
+              L'EXPERTISE AUTOMOBILE SUR-MESURE DU GARD
             </h1>
             <p className="text-[18px] text-white/70 max-w-[400px] mb-10 font-sans">
               Accompagnement premium pour l'achat, l'importation et l'entretien de vos véhicules de prestige.
@@ -93,30 +124,83 @@ export default function Home() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {[
-              { name: "Porsche 911 Carrera S", price: "115 000 €", year: "2020", km: "35 000 km", img: "https://images.unsplash.com/photo-1503376713251-4045fbc555fa?q=80&w=800&auto=format&fit=crop" },
-              { name: "BMW M4 Competition", price: "85 000 €", year: "2021", km: "22 000 km", img: "https://images.unsplash.com/photo-1617814076367-b7713d230e15?q=80&w=800&auto=format&fit=crop" },
-              { name: "Audi RS6 Avant", price: "128 000 €", year: "2022", km: "15 000 km", img: "https://images.unsplash.com/photo-1603525281486-3ddebbc65476?q=80&w=800&auto=format&fit=crop" },
-            ].map((car, idx) => (
-              <div key={idx} className="bg-darker group overflow-hidden border border-white/10 shadow-sm hover:border-primary transition-all duration-300">
-                <div className="relative h-64 overflow-hidden">
-                  <img src={car.img} alt={car.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" referrerPolicy="no-referrer" />
-                  <div className="absolute top-4 right-4 bg-primary text-white px-3 py-1 text-xs font-bold uppercase">
-                    {car.price}
+            {favorites.length > 0 ? (
+              favorites.map((car) => (
+                <div key={car.id} className="bg-darker group overflow-hidden border border-white/10 shadow-sm hover:border-primary transition-all duration-300">
+                  <div className="relative h-64 overflow-hidden">
+                    <img 
+                      src={car.images && car.images[0] ? car.images[0] : (car.img || 'https://images.unsplash.com/photo-1503376713251-4045fbc555fa?q=80&w=800&auto=format&fit=crop')} 
+                      alt={`${car.brand} ${car.model}`} 
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" 
+                      referrerPolicy="no-referrer" 
+                    />
+                    <div className="absolute top-4 right-4 bg-primary text-white px-3 py-1 text-xs font-bold uppercase">
+                      {car.price}
+                    </div>
+                  </div>
+                  <div className="p-6">
+                    <h3 className="font-heading font-bold text-lg uppercase mb-4 text-white line-clamp-1">{car.brand} {car.model}</h3>
+                    <div className="flex flex-col gap-2 text-white/50 text-xs uppercase tracking-wider mb-6">
+                      <p>Année: <strong className="text-white font-bold">{car.year}</strong></p>
+                      <p>Kilométrage: <strong className="text-white font-bold">{car.km}</strong></p>
+                    </div>
+                    <Link to="/buy-sell" className="block w-full text-center border-2 border-primary text-white hover:bg-primary py-3 font-bold uppercase text-xs transition-colors">
+                      Plus de détails
+                    </Link>
                   </div>
                 </div>
-                <div className="p-6">
-                  <h3 className="font-heading font-bold text-lg uppercase mb-4 text-white">{car.name}</h3>
-                  <div className="flex flex-col gap-2 text-white/50 text-xs uppercase tracking-wider mb-6">
-                    <p>Année: <strong className="text-white font-bold">{car.year}</strong></p>
-                    <p>Kilométrage: <strong className="text-white font-bold">{car.km}</strong></p>
-                  </div>
-                  <Link to="/contact" className="block w-full text-center border-2 border-primary text-white hover:bg-primary py-3 font-bold uppercase text-xs transition-colors">
-                    Demander des infos
-                  </Link>
-                </div>
+              ))
+            ) : (
+              <div className="col-span-full py-12 text-center border border-dashed border-white/10 rounded">
+                <p className="text-white/30 uppercase tracking-[2px] text-xs font-bold font-sans">Sélectionnez vos favoris dans l'espace admin pour les afficher ici.</p>
               </div>
-            ))}
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* NOS TRANSFORMATIONS */}
+      <section className="py-24 bg-darker border-t border-white/5">
+        <div className="container mx-auto px-4">
+          <div className="flex flex-col md:flex-row justify-between items-end mb-12">
+            <div>
+              <h2 className="text-3xl md:text-5xl font-sans font-black uppercase text-white mb-4">
+                Nos <span className="text-primary">Transformations</span>
+              </h2>
+            </div>
+            <Link to="/detailing" className="mt-6 md:mt-0 text-white/70 hover:text-primary font-bold uppercase tracking-wider text-sm flex items-center gap-2 transition-colors">
+              Voir toute la galerie <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+            {galleryFavorites.length > 0 ? (
+              galleryFavorites.map((gal) => (
+                <div key={gal.id} className="group overflow-hidden rounded-lg shadow-2xl bg-anthracite border border-white/5">
+                  <div className="grid grid-cols-2 h-64 md:h-80 overflow-hidden">
+                    <div className="relative group/before">
+                      <img src={gal.beforeImg} className="w-full h-full object-cover grayscale group-hover/before:grayscale-0 transition-all duration-700" referrerPolicy="no-referrer" />
+                      <div className="absolute top-4 left-4 bg-black/60 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-white border border-white/10 backdrop-blur-sm">Avant</div>
+                    </div>
+                    <div className="relative group/after">
+                      <img src={gal.afterImg} className="w-full h-full object-cover group-hover/after:scale-110 transition-all duration-700" referrerPolicy="no-referrer" />
+                      <div className="absolute top-4 right-4 bg-primary px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-white shadow-lg">Après</div>
+                    </div>
+                  </div>
+                  <div className="p-6 border-t border-white/5">
+                    <div className="flex items-center gap-3 mb-2">
+                       <Sparkles className="w-4 h-4 text-primary" />
+                       <h3 className="font-heading font-bold text-white uppercase tracking-tight line-clamp-1">{gal.afterDesc}</h3>
+                    </div>
+                    <p className="text-[11px] text-white/40 uppercase tracking-wider">État initial: {gal.beforeDesc}</p>
+                  </div>
+                </div>
+              ))
+            ) : (
+                <div className="col-span-full py-12 text-center border border-dashed border-white/10 rounded">
+                  <p className="text-white/30 uppercase tracking-[2px] text-xs font-bold font-sans">Sélectionnez vos réalisations favorites dans l'espace admin pour les afficher ici.</p>
+                </div>
+              )}
           </div>
         </div>
       </section>

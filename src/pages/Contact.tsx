@@ -42,7 +42,7 @@ export default function Contact() {
             Contact & <span className="text-primary">Accès</span>
           </h1>
           <p className="text-gray-300 font-light max-w-2xl mx-auto">
-            Notre showroom et studio detailing vous accueillent à Nîmes. N'hésitez pas à nous contacter pour un projet automobile sur-mesure.
+            Notre showroom et studio detailing vous accueillent à Beaucaire. N'hésitez pas à nous contacter pour un projet automobile sur-mesure.
           </p>
         </div>
       </section>
@@ -62,7 +62,7 @@ export default function Contact() {
                   </div>
                   <div>
                     <h3 className="font-bold uppercase tracking-[1px] text-xs text-white/50 mb-1 border-b border-white/5 pb-1">Adresse</h3>
-                    <p className="text-white">BRB Auto Pro<br/>Zone d'Activité Kilomètre Delta<br/>30900 Nîmes, France</p>
+                    <p className="text-white">BRB Auto Pro<br/>6 Chemin des Moulins<br/>30300 Beaucaire, France</p>
                   </div>
                 </li>
                 <li className="flex items-start gap-4">
@@ -71,8 +71,8 @@ export default function Contact() {
                   </div>
                   <div>
                     <h3 className="font-bold uppercase tracking-[1px] text-xs text-white/50 mb-1 border-b border-white/5 pb-1">Téléphone & WhatsApp</h3>
-                    <a href="tel:+33466000000" className="text-white font-bold text-lg hover:text-primary transition-colors block mt-1">04 66 00 00 00</a>
-                    <a href="#" className="text-green-500 text-[11px] uppercase tracking-wider font-bold flex items-center mt-1">Discuter sur WhatsApp</a>
+                    <a href="tel:+33781787360" className="text-white font-bold text-lg hover:text-primary transition-colors block mt-1">07 81 78 73 60</a>
+                    <a href="https://wa.me/33781787360" target="_blank" rel="noopener noreferrer" className="text-green-500 text-[11px] uppercase tracking-wider font-bold flex items-center mt-1">Discuter sur WhatsApp</a>
                   </div>
                 </li>
                 <li className="flex items-start gap-4">
@@ -81,18 +81,17 @@ export default function Contact() {
                   </div>
                   <div>
                     <h3 className="font-bold uppercase tracking-[1px] text-xs text-white/50 mb-1 border-b border-white/5 pb-1">Horaires</h3>
-                    <p className="text-white/80 text-sm mt-2">Lundi - Vendredi : 09:00 - 18:30</p>
-                    <p className="text-white/80 text-sm">Samedi : 09:00 - 12:00 (Sur Rendez-vous)</p>
-                    <p className="text-primary font-bold text-sm">Dimanche : Fermé</p>
+                    <p className="text-white/80 text-sm mt-2">Lundi - Samedi : 08:00 - 20:00</p>
+                    <p className="text-white/80 text-sm">Dimanche : 08:00 - 20:00 (Sur Rendez-vous)</p>
                   </div>
                 </li>
               </ul>
 
-              {/* Mapframe - Since we can't use real iframe maps without a key easily, we use a styled div resembling a map container */}
+              {/* Mapframe */}
               <div className="h-64 bg-darker w-full relative group border border-white/5 rounded overflow-hidden">
                 <img src="https://images.unsplash.com/photo-1524661135-423995f22d0b?q=80&w=800&auto=format&fit=crop" className="w-full h-full object-cover opacity-30 grayscale" alt="Map" referrerPolicy="no-referrer" />
                 <div className="absolute inset-0 flex items-center justify-center bg-anthracite/60 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <a href="https://maps.google.com/?q=Nîmes" target="_blank" rel="noreferrer" className="bg-primary text-white px-6 py-3 font-bold uppercase text-xs rounded transition-colors hover:bg-primary-hover">Ouvrir dans Google Maps</a>
+                  <a href="https://maps.google.com/?q=6+Chemin+des+Moulins,+30300+Beaucaire" target="_blank" rel="noreferrer" className="bg-primary text-white px-6 py-3 font-bold uppercase text-xs rounded transition-colors hover:bg-primary-hover">Ouvrir dans Google Maps</a>
                 </div>
               </div>
             </div>

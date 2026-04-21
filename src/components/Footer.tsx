@@ -1,7 +1,10 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Car, MapPin, Phone, Mail, Clock, Instagram, Facebook } from "lucide-react";
 
 export default function Footer() {
+  const [logoError, setLogoError] = useState(false);
+
   return (
     <footer className="bg-darker text-white pt-16 pb-8 border-t border-white/10">
       <div className="container mx-auto px-4">
@@ -9,15 +12,24 @@ export default function Footer() {
           {/* Brand */}
           <div>
             <Link to="/" className="flex items-center gap-2 mb-6 group">
-              <span className="font-sans font-black text-2xl tracking-tighter uppercase">
-                BRB<span className="text-primary font-normal">AUTO</span> PRO
-              </span>
+              {!logoError ? (
+                <img 
+                  src="/logo.jpg" 
+                  alt="BRB Auto Pro Logo" 
+                  className="h-24 w-auto object-contain"
+                  onError={() => setLogoError(true)}
+                />
+              ) : (
+                <span className="font-sans font-black text-2xl tracking-tighter uppercase">
+                  BRB<span className="text-primary font-normal">AUTO</span> PRO
+                </span>
+              )}
             </Link>
             <p className="text-white/50 text-xs leading-[1.6] mb-6">
-              Votre expert automobile de confiance à Nîmes. Spécialiste en import de véhicules premium, achat-vente multimarque et detailing sur-mesure.
+              Votre expert automobile de confiance dans le Gard. Spécialiste en import de véhicules premium, achat-vente multimarque et detailing sur-mesure.
             </p>
             <div className="flex gap-4">
-              <a href="#" className="w-10 h-10 rounded bg-anthracite flex items-center justify-center hover:bg-primary transition-colors text-white">
+              <a href="https://www.instagram.com/brbautopro?igsh=MXdmd3p3aDZrdXZheQ==" target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded bg-anthracite flex items-center justify-center hover:bg-primary transition-colors text-white">
                 <Instagram className="w-5 h-5" />
               </a>
               <a href="#" className="w-10 h-10 rounded bg-anthracite flex items-center justify-center hover:bg-primary transition-colors text-white">
@@ -53,15 +65,15 @@ export default function Footer() {
             <ul className="space-y-4 text-xs text-white/50">
               <li className="flex items-start gap-3">
                 <MapPin className="w-4 h-4 text-primary shrink-0 mt-0.5" />
-                <span>Zone d'Activité Kilomètre Delta<br />30900 Nîmes, France</span>
+                <span>6 Chemin des Moulins<br />30300 Beaucaire, France</span>
               </li>
               <li className="flex items-center gap-3">
                 <Phone className="w-4 h-4 text-primary shrink-0" />
-                <a href="tel:+330466000000" className="hover:text-white transition-colors">04 66 00 00 00</a>
+                <a href="tel:+33781787360" className="hover:text-white transition-colors">07 81 78 73 60</a>
               </li>
               <li className="flex items-center gap-3">
                 <Mail className="w-4 h-4 text-primary shrink-0" />
-                <a href="mailto:contact@brbautopro.fr" className="hover:text-white transition-colors">contact@brbautopro.fr</a>
+                <a href="mailto:brbautopro@gmail.com" className="hover:text-white transition-colors">brbautopro@gmail.com</a>
               </li>
             </ul>
           </div>
@@ -71,16 +83,12 @@ export default function Footer() {
             <h4 className="font-sans font-bold text-sm mb-6 uppercase tracking-[1px]">Horaires</h4>
             <ul className="space-y-3 text-xs text-white/50">
               <li className="flex justify-between items-center border-b border-white/5 pb-2">
-                <span className="flex items-center gap-2"><Clock className="w-3 h-3" /> Lun - Ven</span>
-                <span>09:00 - 18:30</span>
-              </li>
-              <li className="flex justify-between items-center border-b border-white/5 pb-2">
-                <span className="flex items-center gap-2"><Clock className="w-3 h-3" /> Samedi</span>
-                <span>09:00 - 12:00 (Sur RDV)</span>
+                <span className="flex items-center gap-2"><Clock className="w-3 h-3" /> Lun - Sam</span>
+                <span>08:00 - 20:00</span>
               </li>
               <li className="flex justify-between items-center text-primary pt-1">
-                <span>Dimanche</span>
-                <span className="font-bold">Fermé</span>
+                <span className="flex items-center gap-2"><Clock className="w-3 h-3" /> Dimanche</span>
+                <span className="font-bold">08:00 - 20:00 (RDV)</span>
               </li>
             </ul>
           </div>

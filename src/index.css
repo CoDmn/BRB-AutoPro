@@ -2,11 +2,11 @@
 @import "tailwindcss";
 
 @theme {
-  --color-primary: #E60000;
-  --color-primary-hover: #CC0000;
-  --color-anthracite: #2F2F2F;
-  --color-anthracite-light: #3F3F3F;
-  --color-darker: #1A1A1A;
+  --color-primary: #D11242;
+  --color-primary-hover: #A80D34;
+  --color-anthracite: #111111;
+  --color-anthracite-light: #1A1A1A;
+  --color-darker: #050505;
   
   --font-sans: 'Inter', system-ui, sans-serif;
   --font-heading: 'Montserrat', sans-serif;

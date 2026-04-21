@@ -14,6 +14,7 @@ service cloud.firestore {
     function isAdmin() {
       return isSignedIn() && (
         request.auth.token.email == "corentindamian@gmail.com" ||
+        request.auth.token.email == "brbautopro@gmail.com" ||
         exists(/databases/$(database)/documents/admins/$(request.auth.uid))
       );
     }
@@ -71,36 +72,53 @@ service cloud.firestore {
     }
 
     function isValidInventoryItem(data) {
-      return data.keys().hasAll(['name', 'price', 'year', 'km', 'fuel', 'gearbox', 'img', 'createdAt', 'updatedAt']) &&
-             data.keys().size() == 9 &&
-             data.name is string && data.name.size() <= 150 &&
-             data.price is string && data.price.size() <= 50 &&
-             data.year is string && data.year.size() <= 10 &&
-             data.km is string && data.km.size() <= 20 &&
-             data.fuel is string && data.fuel.size() <= 50 &&
-             data.gearbox is string && data.gearbox.size() <= 50 &&
-             data.img is string && data.img.size() <= 500 &&
+      let requiredFields = ['brand', 'model', 'name', 'price', 'year', 'km', 'fuel', 'gearbox', 'img', 'images', 'createdAt', 'updatedAt'];
+      return data.keys().hasAll(requiredFields) &&
+             data.brand is string && data.brand.size() <= 500 &&
+             data.model is string && data.model.size() <= 500 &&
+             data.name is string && data.name.size() <= 500 &&
+             data.price is string && data.price.size() <= 500 &&
+             data.year is string && data.year.size() <= 100 &&
+             data.km is string && data.km.size() <= 100 &&
+             data.fuel is string && data.fuel.size() <= 200 &&
+             data.gearbox is string && data.gearbox.size() <= 200 &&
+             data.img is string && data.img.size() <= 1048576 &&
+             data.images is list && data.images.size() <= 10 &&
+             (data.keys().hasAny(['details']) ? data.details is string && data.details.size() <= 20000 : true) &&
              data.createdAt == request.time &&
              data.updatedAt == request.time;
     }
 
     function isValidDetailingGallery(data) {
       return data.keys().hasAll(['beforeImg', 'afterImg', 'beforeDesc', 'afterDesc', 'createdAt', 'updatedAt']) &&
-             data.keys().size() == 6 &&
-             data.beforeImg is string && data.beforeImg.size() <= 500 &&
-             data.afterImg is string && data.afterImg.size() <= 500 &&
-             data.beforeDesc is string && data.beforeDesc.size() <= 200 &&
-             data.afterDesc is string && data.afterDesc.size() <= 200 &&
+             data.beforeImg is string && data.beforeImg.size() <= 1048576 &&
+             data.afterImg is string && data.afterImg.size() <= 1048576 &&
+             data.beforeDesc is string && data.beforeDesc.size() <= 5000 &&
+             data.afterDesc is string && data.afterDesc.size() <= 5000 &&
+             (data.keys().hasAny(['isFavorite']) ? data.isFavorite is bool : true) &&
              data.createdAt == request.time &&
+             data.updatedAt == request.time;
+    }
+
+    function isValidBooking(data) {
+      let requiredFields = ['firstName', 'lastName', 'phone', 'email', 'carModel', 'date', 'status', 'createdAt', 'updatedAt'];
+      return data.keys().hasAll(requiredFields) &&
+             data.firstName is string && data.firstName.size() <= 100 &&
+             data.lastName is string && data.lastName.size() <= 100 &&
+             data.phone is string && data.phone.size() <= 20 &&
+             data.email is string && data.email.size() <= 100 &&
+             data.carModel is string && data.carModel.size() <= 200 &&
+             data.date is string &&
+             data.status in ['pending', 'accepted', 'refused'] &&
              data.updatedAt == request.time;
     }
 
     // --- Collections ---
 
     match /admins/{userId} {
-      allow read: if isAdmin() && isValidId(userId);
+      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       allow list: if isAdmin();
-      allow write: if false; // Admins managed securely outside clients or strictly by super-admin
+      allow write: if false;
     }
 
     match /contactRequests/{requestId} {
@@ -112,7 +130,7 @@ service cloud.firestore {
       allow delete: if isAdmin() && isValidId(requestId);
       allow update: if isAdmin() && isValidId(requestId) &&
                        incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']) &&
-                       incoming().status in ['new', 'read', 'resolved'] &&
+                       (incoming().keys().hasAny(['status']) ? incoming().status in ['new', 'read', 'resolved'] : true) &&
                        incoming().updatedAt == request.time;
     }
 
@@ -123,7 +141,7 @@ service cloud.firestore {
       allow delete: if isAdmin() && isValidId(requestId);
       allow update: if isAdmin() && isValidId(requestId) &&
                        incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']) &&
-                       incoming().status in ['new', 'read', 'resolved'] &&
+                       (incoming().keys().hasAny(['status']) ? incoming().status in ['new', 'read', 'resolved'] : true) &&
                        incoming().updatedAt == request.time;
     }
 
@@ -134,39 +152,37 @@ service cloud.firestore {
       allow delete: if isAdmin() && isValidId(requestId);
       allow update: if isAdmin() && isValidId(requestId) &&
                        incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']) &&
-                       incoming().status in ['new', 'read', 'resolved'] &&
+                       (incoming().keys().hasAny(['status']) ? incoming().status in ['new', 'read', 'resolved'] : true) &&
                        incoming().updatedAt == request.time;
     }
 
     match /inventory/{itemId} {
-      allow read: if isValidId(itemId);
+      allow read: if true;
       allow list: if true;
-      allow create: if isAdmin() && isValidId(itemId) && isValidInventoryItem(incoming());
-      allow delete: if isAdmin() && isValidId(itemId);
-      allow update: if isAdmin() && isValidId(itemId) &&
-                       incoming().diff(existing()).affectedKeys().hasOnly(['name', 'price', 'year', 'km', 'fuel', 'gearbox', 'img', 'updatedAt']) &&
-                       incoming().name is string && incoming().name.size() <= 150 &&
-                       incoming().price is string && incoming().price.size() <= 50 &&
-                       incoming().year is string && incoming().year.size() <= 10 &&
-                       incoming().km is string && incoming().km.size() <= 20 &&
-                       incoming().fuel is string && incoming().fuel.size() <= 50 &&
-                       incoming().gearbox is string && incoming().gearbox.size() <= 50 &&
-                       incoming().img is string && incoming().img.size() <= 500 &&
-                       incoming().updatedAt == request.time;
+      allow create: if isAdmin() && isValidInventoryItem(incoming());
+      allow delete: if isAdmin();
+      allow update: if isAdmin() && (
+        incoming().diff(existing()).affectedKeys().hasAny(['isFavorite', 'updatedAt', 'name', 'price', 'year', 'km', 'fuel', 'gearbox', 'img', 'images', 'details']) ||
+        isValidInventoryItem(incoming())
+      );
     }
 
+    // (Helper isValidInventoryItemForUpdate removed as it is now redundant)
+
     match /detailingGalleries/{galleryId} {
-      allow read: if isValidId(galleryId);
+      allow read: if true;
       allow list: if true;
-      allow create: if isAdmin() && isValidId(galleryId) && isValidDetailingGallery(incoming());
-      allow delete: if isAdmin() && isValidId(galleryId);
-      allow update: if isAdmin() && isValidId(galleryId) &&
-                       incoming().diff(existing()).affectedKeys().hasOnly(['beforeImg', 'afterImg', 'beforeDesc', 'afterDesc', 'updatedAt']) &&
-                       incoming().beforeImg is string && incoming().beforeImg.size() <= 500 &&
-                       incoming().afterImg is string && incoming().afterImg.size() <= 500 &&
-                       incoming().beforeDesc is string && incoming().beforeDesc.size() <= 200 &&
-                       incoming().afterDesc is string && incoming().afterDesc.size() <= 200 &&
-                       incoming().updatedAt == request.time;
+      allow create: if isAdmin() && isValidDetailingGallery(incoming());
+      allow delete: if isAdmin();
+      allow update: if isAdmin() && (
+        incoming().diff(existing()).affectedKeys().hasAny(['beforeImg', 'afterImg', 'beforeDesc', 'afterDesc', 'isFavorite', 'updatedAt']) ||
+        isValidDetailingGallery(incoming())
+      );
+    }
+
+    match /bookings/{bookingId} {
+      allow create: if isValidId(bookingId) && isValidBooking(incoming()) && incoming().createdAt == request.time;
+      allow read, list, delete, update: if isAdmin();
     }
   }
 }

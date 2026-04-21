@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { Sparkles, Droplets, Shield, ChevronRight, CheckCircle2 } from "lucide-react";
 import { db } from "../lib/firebase";
 import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
@@ -32,9 +33,9 @@ export default function Detailing() {
           <p className="text-xl text-white/70 max-w-2xl mx-auto font-light mb-8">
             Polissage, lustrage et protection céramique. L'art de sublimer chaque courbe de votre carrosserie.
           </p>
-          <button className="bg-primary hover:bg-primary-hover text-white px-8 py-3 rounded font-bold uppercase text-xs transition-colors inline-block">
+          <Link to="/booking" className="bg-primary hover:bg-primary-hover text-white px-8 py-3 rounded font-bold uppercase text-xs transition-colors inline-block">
             Réserver une prestation
-          </button>
+          </Link>
         </div>
       </section>
 
@@ -69,7 +70,7 @@ export default function Detailing() {
             {/* Tab content */}
             <div className="w-full md:w-2/3 bg-darker p-8 border border-white/5 min-h-[400px]">
               {activeTab === "ceramic" && (
-                <div className="animate-fade-in">
+                <div className="animate-fade-in h-full flex flex-col">
                   <div className="flex justify-between items-start mb-6 border-b border-white/10 pb-6">
                     <div>
                       <h3 className="text-2xl font-sans font-black uppercase text-white mb-2">Protection Céramique 9H</h3>
@@ -95,14 +96,14 @@ export default function Detailing() {
                       </li>
                     ))}
                   </ul>
-                  <button className="bg-primary hover:bg-primary-hover text-white px-6 py-3 font-bold uppercase text-xs transition-colors w-full sm:w-auto rounded">
-                    Demander un devis
-                  </button>
+                  <Link to="/contact" className="bg-primary hover:bg-primary-hover text-white px-6 py-3 font-bold uppercase text-xs transition-colors w-full sm:w-auto rounded inline-block text-center mt-auto">
+                    Demander plus d'informations
+                  </Link>
                 </div>
               )}
 
               {activeTab === "polish" && (
-                <div className="animate-fade-in">
+                <div className="animate-fade-in h-full flex flex-col">
                   <div className="flex justify-between items-start mb-6 border-b border-white/10 pb-6">
                     <div>
                       <h3 className="text-2xl font-sans font-black uppercase text-white mb-2">Polissage Correction (Stage 2)</h3>
@@ -126,14 +127,14 @@ export default function Detailing() {
                       </li>
                     ))}
                   </ul>
-                  <button className="bg-primary hover:bg-primary-hover text-white px-6 py-3 font-bold uppercase text-xs transition-colors w-full sm:w-auto rounded">
-                    Demander un devis
-                  </button>
+                  <Link to="/contact" className="bg-primary hover:bg-primary-hover text-white px-6 py-3 font-bold uppercase text-xs transition-colors w-full sm:w-auto rounded inline-block text-center mt-auto">
+                    Demander plus d'informations
+                  </Link>
                 </div>
               )}
 
               {activeTab === "interior" && (
-                <div className="animate-fade-in">
+                <div className="animate-fade-in h-full flex flex-col">
                   <div className="flex justify-between items-start mb-6 border-b border-white/10 pb-6">
                     <div>
                       <h3 className="text-2xl font-sans font-black uppercase text-white mb-2">Nettoyage Intérieur Premium</h3>
@@ -157,9 +158,9 @@ export default function Detailing() {
                       </li>
                     ))}
                   </ul>
-                  <button className="bg-primary hover:bg-primary-hover text-white px-6 py-3 font-bold uppercase text-xs transition-colors w-full sm:w-auto rounded">
-                    Réserver
-                  </button>
+                  <Link to="/contact" className="bg-primary hover:bg-primary-hover text-white px-6 py-3 font-bold uppercase text-xs transition-colors w-full sm:w-auto rounded inline-block text-center mt-auto">
+                    Demander plus d'informations
+                  </Link>
                 </div>
               )}
             </div>

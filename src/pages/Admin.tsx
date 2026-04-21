@@ -1,28 +1,50 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { db, auth } from '../lib/firebase';
 import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged, User } from 'firebase/auth';
-import { addInventoryItem, deleteInventoryItem, addDetailingGallery, deleteDetailingGallery } from '../lib/firebaseUtils';
+import { Star, Trash2, Pencil, ArrowLeft, Globe, X } from 'lucide-react';
+import { 
+  addInventoryItem, 
+  deleteInventoryItem, 
+  updateInventoryItem, 
+  toggleInventoryFavorite, 
+  addDetailingGallery, 
+  updateDetailingGallery, 
+  toggleDetailingFavorite,
+  deleteDetailingGallery,
+  updateBookingStatus
+} from '../lib/firebaseUtils';
 import { compressImage } from '../lib/imageUtils';
+import { format } from 'date-fns';
+import { fr } from 'date-fns/locale';
 
 export default function Admin() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'requests' | 'inventory' | 'gallery'>('requests');
+  const [activeTab, setActiveTab] = useState<'requests' | 'inventory' | 'gallery' | 'bookings' | 'settings'>('requests');
   
   // Data states
   const [contactRequests, setContactRequests] = useState<any[]>([]);
   const [importRequests, setImportRequests] = useState<any[]>([]);
+  const [estimationRequests, setEstimationRequests] = useState<any[]>([]);
   const [inventory, setInventory] = useState<any[]>([]);
   const [gallery, setGallery] = useState<any[]>([]);
+  const [bookings, setBookings] = useState<any[]>([]);
 
   // Form states
   const [newCar, setNewCar] = useState({ 
     brand: '', model: '', price: '', year: '', km: '', fuel: '', 
     gearbox: 'Auto', doors: '', seats: '', type: '', color: '', 
-    critair: '', cv: '', ch: '', specificities: '', images: [] as string[]
+    critair: '', cv: '', ch: '', specificities: '', details: '', images: [] as string[]
   });
   const [newGallery, setNewGallery] = useState({ beforeImg: '', afterImg: '', beforeDesc: '', afterDesc: '' });
+  const [editingCarId, setEditingCarId] = useState<string | null>(null);
+  const [editingGalleryId, setEditingGalleryId] = useState<string | null>(null);
+
+  const isAdminEmail = (email: string | null) => {
+    return email === 'corentindamian@gmail.com' || email === 'brbautopro@gmail.com';
+  };
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -33,13 +55,15 @@ export default function Admin() {
   }, []);
 
   useEffect(() => {
-    if (!user || user.email !== 'corentindamian@gmail.com') return;
+    if (!user || !isAdminEmail(user.email)) return;
 
     const unsubs = [
       onSnapshot(query(collection(db, 'contactRequests'), orderBy('createdAt', 'desc')), (snap) => setContactRequests(snap.docs.map(d => ({ id: d.id, ...d.data() })))),
       onSnapshot(query(collection(db, 'importRequests'), orderBy('createdAt', 'desc')), (snap) => setImportRequests(snap.docs.map(d => ({ id: d.id, ...d.data() })))),
+      onSnapshot(query(collection(db, 'estimationRequests'), orderBy('createdAt', 'desc')), (snap) => setEstimationRequests(snap.docs.map(d => ({ id: d.id, ...d.data() })))),
       onSnapshot(query(collection(db, 'inventory'), orderBy('createdAt', 'desc')), (snap) => setInventory(snap.docs.map(d => ({ id: d.id, ...d.data() })))),
       onSnapshot(query(collection(db, 'detailingGalleries'), orderBy('createdAt', 'desc')), (snap) => setGallery(snap.docs.map(d => ({ id: d.id, ...d.data() })))),
+      onSnapshot(query(collection(db, 'bookings'), orderBy('createdAt', 'desc')), (snap) => setBookings(snap.docs.map(d => ({ id: d.id, ...d.data() })))),
     ];
 
     return () => unsubs.forEach(unsub => unsub());
@@ -72,16 +96,93 @@ export default function Admin() {
         name: `${newCar.brand} ${newCar.model}`, // Auto-generate name based on brand+model
         img: newCar.images[0] // Set the first image as cover `img` for backward compatibility
       };
-      await addInventoryItem(carData);
+
+      if (editingCarId) {
+        await updateInventoryItem(editingCarId, carData);
+        setEditingCarId(null);
+        alert("Véhicule mis à jour !");
+      } else {
+        await addInventoryItem(carData);
+        alert("Véhicule ajouté !");
+      }
+
       setNewCar({ 
         brand: '', model: '', price: '', year: '', km: '', fuel: '', 
         gearbox: 'Auto', doors: '', seats: '', type: '', color: '', 
-        critair: '', cv: '', ch: '', specificities: '', images: [] 
+        critair: '', cv: '', ch: '', specificities: '', details: '', images: [] 
       });
-      alert("Véhicule ajouté !");
     } catch (err) {
       console.error(err);
-      alert("Erreur lors de l'ajout.");
+      alert("Erreur lors de l'enregistrement.");
+    }
+  };
+
+  const handleEditCar = (car: any) => {
+    setActiveTab('inventory');
+    setEditingCarId(car.id);
+    setNewCar({
+      brand: car.brand || '',
+      model: car.model || '',
+      price: car.price || '',
+      year: car.year || '',
+      km: car.km || '',
+      fuel: car.fuel || '',
+      gearbox: car.gearbox || 'Auto',
+      doors: car.doors || '',
+      seats: car.seats || '',
+      type: car.type || '',
+      color: car.color || '',
+      critair: car.critair || '',
+      cv: car.cv || '',
+      ch: car.ch || '',
+      specificities: car.specificities || '',
+      details: car.details || '',
+      images: car.images || [car.img].filter(Boolean)
+    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleToggleFavorite = async (car: any) => {
+    const favoritesCount = inventory.filter(c => c.isFavorite).length;
+    
+    if (!car.isFavorite && favoritesCount >= 3) {
+      alert("Vous ne pouvez avoir que 3 véhicules en favoris (Derniers Arrivages) au maximum.");
+      return;
+    }
+
+    try {
+      await toggleInventoryFavorite(car.id, !car.isFavorite);
+    } catch (err) {
+      console.error(err);
+      alert("Erreur lors de la mise à jour des favoris.");
+    }
+  };
+
+  const handleToggleGalleryFavorite = async (gal: any) => {
+    const favoritesCount = gallery.filter(g => g.isFavorite).length;
+    
+    if (!gal.isFavorite && favoritesCount >= 2) {
+      alert("Vous ne pouvez avoir que 2 réalisations en favoris (Nos Transformations) au maximum.");
+      return;
+    }
+
+    try {
+      await toggleDetailingFavorite(gal.id, !gal.isFavorite);
+    } catch (err) {
+      console.error(err);
+      alert("Erreur lors de la mise à jour des favoris.");
+    }
+  };
+
+  const handleUpdateBookingStatus = async (id: string, status: 'accepted' | 'refused') => {
+    try {
+      await updateBookingStatus(id, status);
+      // Here we could add a call to an edge function to send emails if we had one.
+      // For now we'll just alert.
+      alert(status === 'accepted' ? "Rendez-vous validé ! Un mail (simulé) a été envoyé au client." : "Rendez-vous refusé.");
+    } catch (err: any) {
+      console.error("Error updating booking status:", err);
+      alert("Erreur lors de la mise à jour du statut : " + (err.message || "Erreur inconnue"));
     }
   };
 
@@ -92,13 +193,31 @@ export default function Admin() {
       return;
     }
     try {
-      await addDetailingGallery(newGallery);
+      if (editingGalleryId) {
+        await updateDetailingGallery(editingGalleryId, newGallery);
+        setEditingGalleryId(null);
+        alert("Galerie mise à jour !");
+      } else {
+        await addDetailingGallery(newGallery);
+        alert("Galerie ajoutée !");
+      }
       setNewGallery({ beforeImg: '', afterImg: '', beforeDesc: '', afterDesc: '' });
-      alert("Galerie ajoutée !");
     } catch (err) {
       console.error(err);
-      alert("Erreur lors de l'ajout.");
+      alert("Erreur lors de l'enregistrement.");
     }
+  };
+
+  const handleEditGallery = (gal: any) => {
+    setActiveTab('gallery');
+    setEditingGalleryId(gal.id);
+    setNewGallery({
+      beforeImg: gal.beforeImg || '',
+      afterImg: gal.afterImg || '',
+      beforeDesc: gal.beforeDesc || '',
+      afterDesc: gal.afterDesc || ''
+    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleCarImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -143,24 +262,30 @@ export default function Admin() {
   if (!user) {
     return (
       <div className="min-h-screen bg-anthracite flex flex-col items-center justify-center p-4">
-        <div className="bg-darker p-8 rounded border border-white/10 text-center max-w-sm w-full">
-          <h1 className="text-2xl font-sans font-black uppercase text-white mb-6">Accès Admin</h1>
-          <p className="text-white/50 text-sm mb-6">Veuillez vous connecter avec votre compte administrateur.</p>
-          <button onClick={handleLogin} className="bg-primary hover:bg-primary-hover text-white py-3 px-6 rounded font-bold uppercase tracking-wider text-xs w-full transition-colors mb-4">
+        <Link to="/" className="absolute top-8 left-8 flex items-center gap-2 text-white/50 hover:text-white transition-colors uppercase font-bold text-xs tracking-widest">
+          <ArrowLeft className="w-4 h-4" /> Retour au site
+        </Link>
+        <div className="bg-darker p-8 rounded border border-white/10 text-center max-w-sm w-full shadow-2xl">
+          <h1 className="text-2xl font-sans font-black uppercase text-white mb-6 tracking-wider">Accès Admin</h1>
+          <p className="text-white/50 text-sm mb-6 leading-relaxed">Veuillez vous connecter avec un compte administrateur autorisé.</p>
+          <button onClick={handleLogin} className="bg-primary hover:bg-primary-hover text-white py-3 px-6 rounded font-bold uppercase tracking-wider text-xs w-full transition-colors mb-4 shadow-lg shadow-primary/20">
             Connexion Google
           </button>
-          <p className="text-[10px] text-white/40 uppercase tracking-wider">Note : Si la connexion échoue, veuillez ouvrir le site dans un <strong>nouvel onglet</strong> (icône flèche en haut à droite de l'aperçu).</p>
+          <p className="text-[10px] text-white/40 uppercase tracking-wider leading-relaxed">Note : Si la connexion échoue, veuillez ouvrir le site dans un <strong>nouvel onglet</strong>.</p>
         </div>
       </div>
     );
   }
 
-  if (user.email !== 'corentindamian@gmail.com') {
+  if (!isAdminEmail(user.email)) {
     return (
       <div className="min-h-screen bg-anthracite flex flex-col items-center justify-center p-4 text-center">
         <h1 className="text-2xl font-sans font-black uppercase text-white mb-4">Accès Refusé</h1>
-        <p className="text-white/50 mb-6">Vous n'êtes pas autorisé à accéder à cette page ({user.email}).</p>
-        <button onClick={handleLogout} className="bg-darker border border-white/10 text-white py-2 px-6 rounded uppercase font-bold text-xs">Déconnexion</button>
+        <p className="text-white/50 mb-6">L'adresse <strong>{user.email}</strong> n'est pas autorisée.</p>
+        <div className="flex gap-4">
+          <button onClick={handleLogout} className="bg-darker border border-white/10 text-white py-2 px-6 rounded uppercase font-bold text-xs hover:bg-white/5 transition-colors">Déconnexion</button>
+          <Link to="/" className="bg-primary text-white py-2 px-6 rounded uppercase font-bold text-xs hover:bg-primary-hover transition-colors">Quitter</Link>
+        </div>
       </div>
     );
   }
@@ -169,7 +294,12 @@ export default function Admin() {
     <div className="min-h-screen bg-anthracite text-white p-8">
       <div className="container mx-auto">
         <div className="flex justify-between items-center mb-8 border-b border-white/10 pb-6">
-          <h1 className="text-3xl font-sans font-black uppercase tracking-wider">Dashboard Admin</h1>
+          <div className="flex items-center gap-6">
+            <h1 className="text-3xl font-sans font-black uppercase tracking-wider">Dashboard Admin</h1>
+            <Link to="/" className="flex items-center gap-2 bg-white/5 hover:bg-white/10 text-white/70 hover:text-white px-3 py-1 rounded text-[10px] uppercase font-bold transition-all border border-white/5">
+              <Globe className="w-3 h-3" /> Voir le site
+            </Link>
+          </div>
           <div className="flex items-center gap-4">
             <p className="text-sm text-white/50">{user.email}</p>
             <button onClick={handleLogout} className="text-xs bg-darker hover:bg-white/5 border border-white/10 px-4 py-2 rounded transition-colors uppercase font-bold tracking-wider">
@@ -180,12 +310,92 @@ export default function Admin() {
 
         <div className="flex gap-4 mb-8">
           <button onClick={() => setActiveTab('requests')} className={`px-4 py-2 uppercase font-bold text-xs tracking-wider border-b-2 transition-colors ${activeTab === 'requests' ? 'border-primary text-primary' : 'border-transparent text-white/50 hover:text-white'}`}>Demandes Client</button>
+          <button onClick={() => setActiveTab('bookings')} className={`px-4 py-2 uppercase font-bold text-xs tracking-wider border-b-2 transition-colors ${activeTab === 'bookings' ? 'border-primary text-primary' : 'border-transparent text-white/50 hover:text-white'}`}>Rendez-vous</button>
           <button onClick={() => setActiveTab('inventory')} className={`px-4 py-2 uppercase font-bold text-xs tracking-wider border-b-2 transition-colors ${activeTab === 'inventory' ? 'border-primary text-primary' : 'border-transparent text-white/50 hover:text-white'}`}>Inventaire</button>
           <button onClick={() => setActiveTab('gallery')} className={`px-4 py-2 uppercase font-bold text-xs tracking-wider border-b-2 transition-colors ${activeTab === 'gallery' ? 'border-primary text-primary' : 'border-transparent text-white/50 hover:text-white'}`}>Galerie Detailing</button>
+          <button onClick={() => setActiveTab('settings')} className={`px-4 py-2 uppercase font-bold text-xs tracking-wider border-b-2 transition-colors ${activeTab === 'settings' ? 'border-primary text-primary' : 'border-transparent text-white/50 hover:text-white'}`}>Paramètres</button>
         </div>
+
+        {activeTab === 'bookings' && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fade-in">
+            <div className="bg-darker rounded border border-white/10 p-6">
+              <h2 className="text-xl font-sans font-black uppercase mb-6 text-yellow-500">Demandes en attente ({bookings.filter(b => b.status === 'pending').length})</h2>
+              <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2">
+                {bookings.filter(b => b.status === 'pending').map(booking => (
+                  <div key={booking.id} className="bg-anthracite p-4 rounded border border-white/5">
+                    <div className="flex justify-between items-start mb-2">
+                      <h3 className="font-bold text-sm uppercase">{booking.firstName} {booking.lastName}</h3>
+                      <span className="text-[10px] uppercase font-bold bg-yellow-500/20 text-yellow-500 px-2 py-1 rounded">En attente</span>
+                    </div>
+                    <p className="text-xs text-white/70 mb-2">{booking.email} • {booking.phone}</p>
+                    <p className="text-xs text-primary mb-2 font-bold uppercase">{booking.service} - {booking.carModel}</p>
+                    <p className="text-sm font-bold mb-4">{format(new Date(booking.date), "EEEE d MMMM yyyy 'à' HH'h'mm", { locale: fr })}</p>
+                    <div className="flex gap-2">
+                      <button onClick={() => handleUpdateBookingStatus(booking.id, 'accepted')} className="flex-1 bg-green-600 hover:bg-green-500 text-white py-2 rounded text-[10px] font-bold uppercase tracking-wider transition-colors">Accepter</button>
+                      <button onClick={() => handleUpdateBookingStatus(booking.id, 'refused')} className="flex-1 bg-red-600/20 hover:bg-red-600/40 text-red-500 py-2 rounded text-[10px] font-bold uppercase tracking-wider transition-colors">Refuser</button>
+                    </div>
+                  </div>
+                ))}
+                {bookings.filter(b => b.status === 'pending').length === 0 && <p className="text-white/30 italic text-sm">Aucune demande en attente.</p>}
+              </div>
+            </div>
+            <div className="bg-darker rounded border border-white/10 p-6">
+              <h2 className="text-xl font-sans font-black uppercase mb-6 text-green-500">Rendez-vous validés ({bookings.filter(b => b.status === 'accepted').length})</h2>
+              <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2">
+                {bookings.filter(b => b.status !== 'pending').map(booking => (
+                  <div key={booking.id} className={`bg-anthracite p-4 rounded border border-white/5 ${booking.status === 'accepted' ? 'border-l-4 border-l-green-500' : 'opacity-50 border-l-4 border-l-red-500'}`}>
+                    <div className="flex justify-between items-start mb-1">
+                      <h3 className="font-bold text-sm uppercase">{booking.firstName} {booking.lastName}</h3>
+                      <span className={`text-[10px] uppercase font-bold px-2 py-1 rounded ${booking.status === 'accepted' ? 'bg-green-500/20 text-green-500' : 'bg-red-500/20 text-red-500'}`}>{booking.status === 'accepted' ? 'Validé' : 'Refusé'}</span>
+                    </div>
+                    <p className="text-xs text-white/50">{booking.carModel} • {format(new Date(booking.date), "d MMM yyyy HH'h'mm", { locale: fr })}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {localStorage.getItem('brb_google_calendar_url') && (
+              <div className="lg:col-span-2 bg-darker rounded border border-white/10 p-6">
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-xl font-sans font-black uppercase text-white">Mon Agenda Google</h2>
+                  <span className="text-[10px] text-white/30 uppercase tracking-widest font-bold">Synchronisation active</span>
+                </div>
+                <div className="aspect-video w-full bg-anthracite rounded overflow-hidden">
+                  <iframe 
+                    src={localStorage.getItem('brb_google_calendar_url') || ''} 
+                    style={{ border: 0 }} 
+                    width="100%" 
+                    height="100%" 
+                    frameBorder="0" 
+                    scrolling="no"
+                    title="Google Calendar"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {activeTab === 'requests' && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="bg-darker rounded border border-white/10 p-6">
+              <h2 className="text-xl font-sans font-black uppercase mb-6 text-primary">Demandes d'Estimation ({estimationRequests.length})</h2>
+              <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2">
+                {estimationRequests.map(req => (
+                  <div key={req.id} className="bg-anthracite p-4 rounded border border-white/5">
+                    <div className="flex justify-between items-start mb-2">
+                      <h3 className="font-bold text-sm uppercase">{req.brand} {req.model}</h3>
+                      <span className="text-[10px] uppercase font-bold bg-primary/20 text-primary px-2 py-1 rounded">{req.status}</span>
+                    </div>
+                    <p className="text-xs text-white/70 mb-2">{req.email}</p>
+                    <div className="text-xs text-white/50 grid grid-cols-2 gap-1 mb-2">
+                      <p>Année: <strong className="text-white">{req.year}</strong></p>
+                      <p>KM: <strong className="text-white">{req.km}</strong></p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
             <div className="bg-darker rounded border border-white/10 p-6">
               <h2 className="text-xl font-sans font-black uppercase mb-6 text-primary">Demandes d'Import ({importRequests.length})</h2>
               <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2">
@@ -224,9 +434,26 @@ export default function Admin() {
         )}
 
         {activeTab === 'inventory' && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div className="bg-darker rounded border border-white/10 p-6">
-              <h2 className="text-xl font-sans font-black uppercase mb-6 text-white">Ajouter un véhicule</h2>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fade-in">
+            <div className="bg-darker rounded border border-white/10 p-6 h-fit shadow-xl">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-sans font-black uppercase text-white">{editingCarId ? 'Modifier le véhicule' : 'Ajouter un véhicule'}</h2>
+                {editingCarId && (
+                  <button 
+                    onClick={() => {
+                      setEditingCarId(null);
+                      setNewCar({ 
+                        brand: '', model: '', price: '', year: '', km: '', fuel: '', 
+                        gearbox: 'Auto', doors: '', seats: '', type: '', color: '', 
+                        critair: '', cv: '', ch: '', specificities: '', details: '', images: [] 
+                      });
+                    }}
+                    className="flex items-center gap-1 text-[10px] uppercase font-bold text-white/40 hover:text-white transition-colors"
+                  >
+                    <X className="w-3 h-3" /> Annuler
+                  </button>
+                )}
+              </div>
               <form onSubmit={handleAddCar} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <input required placeholder="Marque (ex: Porsche)" value={newCar.brand} onChange={e => setNewCar({...newCar, brand: e.target.value})} className="w-full px-4 py-2 bg-anthracite border border-white/10 text-white text-sm" />
@@ -256,6 +483,11 @@ export default function Admin() {
                 </div>
 
                 <textarea placeholder="Spécificités / Finitions..." value={newCar.specificities} onChange={e => setNewCar({...newCar, specificities: e.target.value})} className="w-full px-4 py-2 bg-anthracite border border-white/10 text-white text-sm h-20" />
+                
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-white/40 tracking-widest pl-1">Description détaillée (longue)</label>
+                  <textarea placeholder="Détails complets sur le véhicule, équipements, entretien..." value={newCar.details} onChange={e => setNewCar({...newCar, details: e.target.value})} className="w-full px-4 py-3 bg-anthracite border border-white/10 text-white text-sm h-40 focus:border-primary focus:outline-none transition-colors" />
+                </div>
 
                 <div className="border border-white/10 p-4 rounded bg-anthracite">
                   <div className="flex justify-between items-center mb-3">
@@ -297,7 +529,21 @@ export default function Admin() {
                       <h3 className="font-bold text-sm uppercase truncate">{car.brand} {car.model}</h3>
                       <p className="text-xs text-white/50">{car.price} • {car.km} • {car.year}</p>
                     </div>
-                    <button onClick={() => deleteInventoryItem(car.id)} className="text-red-500 hover:text-red-400 font-bold text-xs uppercase px-2">Supprimer</button>
+                    <div className="flex items-center gap-2">
+                      <button 
+                        onClick={() => handleToggleFavorite(car)} 
+                        className={`p-2 rounded transition-colors ${car.isFavorite ? 'text-primary' : 'text-white/20 hover:text-white'}`}
+                        title={car.isFavorite ? "Retirer des favoris" : "Ajouter aux favoris (Derniers Arrivages)"}
+                      >
+                        <Star className={`w-5 h-5 ${car.isFavorite ? 'fill-current' : ''}`} />
+                      </button>
+                      <button onClick={() => handleEditCar(car)} className="p-2 text-white/20 hover:text-blue-400 transition-colors" title="Modifier">
+                        <Pencil className="w-5 h-5" />
+                      </button>
+                      <button onClick={() => deleteInventoryItem(car.id)} className="p-2 text-white/20 hover:text-red-500 transition-colors" title="Supprimer">
+                        <Trash2 className="w-5 h-5" />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -306,9 +552,22 @@ export default function Admin() {
         )}
 
         {activeTab === 'gallery' && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div className="bg-darker rounded border border-white/10 p-6">
-              <h2 className="text-xl font-sans font-black uppercase mb-6 text-white">Ajouter un Avant/Après</h2>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fade-in">
+            <div className="bg-darker rounded border border-white/10 p-6 h-fit shadow-xl">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-sans font-black uppercase text-white">{editingGalleryId ? 'Modifier la réalisation' : 'Ajouter un Avant/Après'}</h2>
+                {editingGalleryId && (
+                  <button 
+                    onClick={() => {
+                      setEditingGalleryId(null);
+                      setNewGallery({ beforeImg: '', afterImg: '', beforeDesc: '', afterDesc: '' });
+                    }}
+                    className="flex items-center gap-1 text-[10px] uppercase font-bold text-white/40 hover:text-white transition-colors"
+                  >
+                    <X className="w-3 h-3" /> Annuler
+                  </button>
+                )}
+              </div>
               <form onSubmit={handleAddGallery} className="space-y-4">
                 <div className="border border-white/10 p-4 rounded bg-anthracite text-center">
                    {newGallery.beforeImg ? (
@@ -359,7 +618,17 @@ export default function Admin() {
                         <p>- {gal.beforeDesc}</p>
                         <p>- {gal.afterDesc}</p>
                       </div>
-                      <button onClick={() => deleteDetailingGallery(gal.id)} className="text-red-500 hover:text-red-400 font-bold text-xs uppercase">Supprimer</button>
+                      <div className="flex items-center gap-4">
+                        <button 
+                          onClick={() => handleToggleGalleryFavorite(gal)} 
+                          className={`p-1 rounded transition-colors ${gal.isFavorite ? 'text-primary' : 'text-white/20 hover:text-white'}`}
+                          title={gal.isFavorite ? "Retirer des favoris" : "Ajouter aux favoris (Nos Transformations)"}
+                        >
+                          <Star className={`w-4 h-4 ${gal.isFavorite ? 'fill-current' : ''}`} />
+                        </button>
+                        <button onClick={() => handleEditGallery(gal)} className="text-blue-400 hover:text-blue-300 font-bold text-xs uppercase" title="Modifier">Modifier</button>
+                        <button onClick={() => deleteDetailingGallery(gal.id)} className="text-red-500 hover:text-red-400 font-bold text-xs uppercase" title="Supprimer">Supprimer</button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -368,6 +637,25 @@ export default function Admin() {
           </div>
         )}
 
+        {activeTab === 'settings' && (
+          <div className="max-w-2xl animate-fade-in">
+            <div className="bg-darker border border-white/10 p-8 rounded">
+              <h2 className="text-xl font-sans font-black uppercase mb-6 text-white">Paramètres Intégrations</h2>
+              <div className="space-y-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-white/40">Lien iFrame Google Calendar (Public)</label>
+                  <input 
+                    placeholder="https://calendar.google.com/calendar/embed?src=..." 
+                    className="w-full bg-anthracite border border-white/10 rounded px-4 py-2 text-white text-sm"
+                    onBlur={(e) => localStorage.setItem('brb_google_calendar_url', e.target.value)}
+                    defaultValue={localStorage.getItem('brb_google_calendar_url') || ''}
+                  />
+                  <p className="text-[10px] text-white/30 italic">Pensez à rendre votre agenda public dans les paramètres Google Calendar pour qu'il s'affiche ici.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

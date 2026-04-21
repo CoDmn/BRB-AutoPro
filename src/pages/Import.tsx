@@ -33,7 +33,7 @@ export default function Import() {
     <div className="bg-anthracite min-h-screen">
       {/* Hero Header */}
       <section className="bg-darker text-white py-24 relative overflow-hidden border-b border-white/10">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_100%_0%,_#E60000_0%,_transparent_40%)] opacity-20" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_100%_0%,_#D11242_0%,_transparent_40%)] opacity-20" />
         <div className="container mx-auto px-4 relative z-10 text-center">
           <h1 className="text-4xl md:text-6xl font-heading font-black uppercase tracking-tighter mb-4">
             Recherche & <span className="text-primary">Importation</span>

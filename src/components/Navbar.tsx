@@ -14,14 +14,24 @@ const navLinks = [
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const location = useLocation();
+  const [logoError, setLogoError] = useState(false);
 
   return (
     <header className="sticky top-0 z-50 w-full bg-darker text-white border-b border-white/10">
-      <div className="container mx-auto px-4 h-20 flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-2 group">
-          <span className="font-sans font-black text-2xl tracking-tighter uppercase">
-            BRB<span className="text-primary font-normal">AUTO</span> PRO
-          </span>
+      <div className="container mx-auto px-4 h-28 flex items-center justify-between">
+        <Link to="/" className="flex items-center gap-2 group shrink-0">
+          {!logoError ? (
+            <img 
+              src="/logo.jpg" 
+              alt="BRB Auto Pro Logo" 
+              className="h-24 w-auto object-contain"
+              onError={() => setLogoError(true)}
+            />
+          ) : (
+            <span className="font-sans font-black text-2xl tracking-tighter uppercase">
+              BRB<span className="text-primary font-normal">AUTO</span> PRO
+            </span>
+          )}
         </Link>
 
         {/* Desktop Nav */}
@@ -38,12 +48,6 @@ export default function Navbar() {
               {link.name}
             </Link>
           ))}
-          <Link
-            to="/contact"
-            className="bg-primary hover:bg-primary-hover text-white px-6 py-3 rounded text-xs font-bold uppercase transition-colors"
-          >
-            Estimer ma voiture
-          </Link>
         </nav>
 
         {/* Mobile Menu Toggle */}
@@ -75,7 +79,7 @@ export default function Navbar() {
             <div className="px-4 pt-4 pb-2 border-t border-white/10 mt-2">
               <Link
                 to="/contact"
-                className="flex justify-center bg-primary hover:bg-primary-hover text-white px-6 py-3 rounded text-xs font-bold uppercase transition-colors"
+                className="flex justify-center border-2 border-white/20 hover:bg-white hover:text-darker text-white px-6 py-3 rounded text-xs font-bold uppercase transition-colors"
                 onClick={() => setIsOpen(false)}
               >
                 Estimer ma voiture
