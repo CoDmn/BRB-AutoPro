@@ -1,0 +1,118 @@
+{
+  "entities": {
+    "ContactRequest": {
+      "title": "ContactRequest",
+      "description": "A submission from the contact form.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "maxLength": 100 },
+        "phone": { "type": "string", "maxLength": 20 },
+        "email": { "type": "string", "format": "email", "maxLength": 100 },
+        "subject": { "type": "string", "maxLength": 100 },
+        "message": { "type": "string", "maxLength": 2000 },
+        "status": { "type": "string", "enum": ["new", "read", "resolved"] },
+        "createdAt": { "type": "timestamp" }
+      },
+      "required": ["name", "phone", "email", "subject", "message", "status", "createdAt"]
+    },
+    "ImportRequest": {
+      "title": "ImportRequest",
+      "description": "A submission from the vehicle import form.",
+      "type": "object",
+      "properties": {
+        "brand": { "type": "string", "maxLength": 100 },
+        "model": { "type": "string", "maxLength": 100 },
+        "year": { "type": "string", "maxLength": 10 },
+        "budget": { "type": "string", "maxLength": 50 },
+        "email": { "type": "string", "format": "email", "maxLength": 100 },
+        "phone": { "type": "string", "maxLength": 20 },
+        "options": { "type": "string", "maxLength": 1000 },
+        "status": { "type": "string", "enum": ["new", "read", "resolved"] },
+        "createdAt": { "type": "timestamp" }
+      },
+      "required": ["brand", "model", "year", "budget", "email", "phone", "options", "status", "createdAt"]
+    },
+    "EstimationRequest": {
+      "title": "EstimationRequest",
+      "description": "A submission from the vehicle estimation form.",
+      "type": "object",
+      "properties": {
+        "brand": { "type": "string", "maxLength": 100 },
+        "model": { "type": "string", "maxLength": 100 },
+        "year": { "type": "string", "maxLength": 10 },
+        "km": { "type": "string", "maxLength": 20 },
+        "email": { "type": "string", "format": "email", "maxLength": 100 },
+        "status": { "type": "string", "enum": ["new", "read", "resolved"] },
+        "createdAt": { "type": "timestamp" }
+      },
+      "required": ["brand", "model", "year", "km", "email", "status", "createdAt"]
+    },
+    "InventoryItem": {
+      "title": "InventoryItem",
+      "description": "A vehicle available in stock.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "maxLength": 150 },
+        "price": { "type": "string", "maxLength": 50 },
+        "year": { "type": "string", "maxLength": 10 },
+        "km": { "type": "string", "maxLength": 20 },
+        "fuel": { "type": "string", "maxLength": 50 },
+        "gearbox": { "type": "string", "maxLength": 50 },
+        "img": { "type": "string", "maxLength": 500 },
+        "createdAt": { "type": "timestamp" },
+        "updatedAt": { "type": "timestamp" }
+      },
+      "required": ["name", "price", "year", "km", "fuel", "gearbox", "img", "createdAt", "updatedAt"]
+    },
+    "DetailingGallery": {
+      "title": "DetailingGallery",
+      "description": "Before/After pictures for detailing.",
+      "type": "object",
+      "properties": {
+        "beforeImg": { "type": "string", "maxLength": 500 },
+        "afterImg": { "type": "string", "maxLength": 500 },
+        "beforeDesc": { "type": "string", "maxLength": 200 },
+        "afterDesc": { "type": "string", "maxLength": 200 },
+        "createdAt": { "type": "timestamp" },
+        "updatedAt": { "type": "timestamp" }
+      },
+      "required": ["beforeImg", "afterImg", "beforeDesc", "afterDesc", "createdAt", "updatedAt"]
+    },
+    "Admin": {
+      "title": "Admin",
+      "description": "An admin user.",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "format": "email", "maxLength": 100 },
+        "createdAt": { "type": "timestamp" }
+      },
+      "required": ["email", "createdAt"]
+    }
+  },
+  "firestore": {
+    "contactRequests/{requestId}": {
+      "schema": "ContactRequest",
+      "description": "Stores user submitted contact requests"
+    },
+    "importRequests/{requestId}": {
+      "schema": "ImportRequest",
+      "description": "Stores user submitted import requests"
+    },
+    "estimationRequests/{requestId}": {
+      "schema": "EstimationRequest",
+      "description": "Stores user submitted estimation requests"
+    },
+    "inventory/{itemId}": {
+      "schema": "InventoryItem",
+      "description": "Stores current available vehicles"
+    },
+    "detailingGalleries/{galleryId}": {
+      "schema": "DetailingGallery",
+      "description": "Stores before and after pics of detailing jobs"
+    },
+    "admins/{userId}": {
+      "schema": "Admin",
+      "description": "Stores authorized admin users"
+    }
+  }
+}

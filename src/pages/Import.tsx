@@ -1,20 +1,32 @@
 import React, { useState } from "react";
 import { CheckCircle2, Globe, FileText, Truck, ShieldCheck, Mail } from "lucide-react";
+import { submitImportRequest } from "../lib/firebaseUtils";
 
 export default function Import() {
   const [formData, setFormData] = useState({
     brand: "",
     model: "",
+    year: "",
     budget: "",
     options: "",
-    email: ""
+    email: "",
+    phone: ""
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Form submitted", formData);
-    alert("Votre demande d'importation a été envoyée avec succès. Nous vous contacterons sous 48h.");
-    setFormData({ brand: "", model: "", budget: "", options: "", email: "" });
+    setIsSubmitting(true);
+    try {
+      await submitImportRequest(formData);
+      alert("Votre demande d'importation a été envoyée avec succès. Nous vous contacterons sous 48h.");
+      setFormData({ brand: "", model: "", year: "", budget: "", options: "", email: "", phone: "" });
+    } catch (error) {
+      console.error(error);
+      alert("Une erreur est survenue lors de l'envoi de votre demande.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -99,6 +111,17 @@ export default function Import() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-white/50 mb-2">Année souhaitée</label>
+                  <input 
+                    type="text" 
+                    placeholder="Ex: 2018 - 2021" 
+                    className="w-full px-4 py-3 bg-darker text-white border border-white/10 focus:outline-none focus:border-primary transition-colors"
+                    value={formData.year}
+                    onChange={(e) => setFormData({...formData, year: e.target.value})}
+                    required
+                  />
+                </div>
+                <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-white/50 mb-2">Budget maximum (TTC)</label>
                   <input 
                     type="text" 
@@ -106,6 +129,20 @@ export default function Import() {
                     className="w-full px-4 py-3 bg-darker text-white border border-white/10 focus:outline-none focus:border-primary transition-colors"
                     value={formData.budget}
                     onChange={(e) => setFormData({...formData, budget: e.target.value})}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-white/50 mb-2">Téléphone</label>
+                  <input 
+                    type="tel" 
+                    placeholder="06 00 00 00 00" 
+                    className="w-full px-4 py-3 bg-darker text-white border border-white/10 focus:outline-none focus:border-primary transition-colors"
+                    value={formData.phone}
+                    onChange={(e) => setFormData({...formData, phone: e.target.value})}
                     required
                   />
                 </div>
@@ -134,8 +171,8 @@ export default function Import() {
               </div>
 
               <div className="pt-4">
-                <button type="submit" className="w-full bg-primary hover:bg-primary-hover text-white py-4 font-bold uppercase tracking-wider flex items-center justify-center gap-2 rounded transition-colors">
-                  <Mail className="w-5 h-5" /> Envoyer ma demande
+                <button type="submit" disabled={isSubmitting} className="w-full bg-primary hover:bg-primary-hover text-white py-4 font-bold uppercase tracking-wider flex items-center justify-center gap-2 rounded transition-colors disabled:opacity-50">
+                  <Mail className="w-5 h-5" /> {isSubmitting ? "Envoi en cours..." : "Envoyer ma demande"}
                 </button>
               </div>
             </form>

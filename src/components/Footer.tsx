@@ -90,7 +90,9 @@ export default function Footer() {
           <p>
             &copy; {new Date().getFullYear()} BRB Auto Pro. Tous droits réservés.
           </p>
-          <div className="flex gap-4">
+          <div className="flex gap-4 items-center">
+            <Link to="/admin" className="hover:text-white transition-colors">Admin</Link>
+            <span className="text-white/10">|</span>
             <a href="#" className="hover:text-white transition-colors">Mentions Légales</a>
             <a href="#" className="hover:text-white transition-colors">Politique de Confidentialité</a>
           </div>

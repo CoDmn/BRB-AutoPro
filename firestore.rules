@@ -1,0 +1,172 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == "corentindamian@gmail.com" ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // --- Validation Helpers ---
+
+    function isValidContactRequest(data) {
+      return data.keys().hasAll(['name', 'phone', 'email', 'subject', 'message', 'status', 'createdAt']) &&
+             data.keys().size() == 7 &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+             data.phone is string && data.phone.size() <= 20 &&
+             data.email is string && data.email.size() > 0 && data.email.size() <= 100 &&
+             data.subject is string && data.subject.size() <= 100 &&
+             data.message is string && data.message.size() > 0 && data.message.size() <= 2000 &&
+             data.status == 'new' &&
+             data.createdAt == request.time;
+    }
+
+    function isValidImportRequest(data) {
+      return data.keys().hasAll(['brand', 'model', 'year', 'budget', 'email', 'phone', 'options', 'status', 'createdAt']) &&
+             data.keys().size() == 9 &&
+             data.brand is string && data.brand.size() <= 100 &&
+             data.model is string && data.model.size() <= 100 &&
+             data.year is string && data.year.size() <= 10 &&
+             data.budget is string && data.budget.size() <= 50 &&
+             data.email is string && data.email.size() <= 100 &&
+             data.phone is string && data.phone.size() <= 20 &&
+             data.options is string && data.options.size() <= 1000 &&
+             data.status == 'new' &&
+             data.createdAt == request.time;
+    }
+
+    function isValidEstimationRequest(data) {
+      return data.keys().hasAll(['brand', 'model', 'year', 'km', 'email', 'status', 'createdAt']) &&
+             data.keys().size() == 7 &&
+             data.brand is string && data.brand.size() <= 100 &&
+             data.model is string && data.model.size() <= 100 &&
+             data.year is string && data.year.size() <= 10 &&
+             data.km is string && data.km.size() <= 20 &&
+             data.email is string && data.email.size() <= 100 &&
+             data.status == 'new' &&
+             data.createdAt == request.time;
+    }
+
+    function isValidInventoryItem(data) {
+      return data.keys().hasAll(['name', 'price', 'year', 'km', 'fuel', 'gearbox', 'img', 'createdAt', 'updatedAt']) &&
+             data.keys().size() == 9 &&
+             data.name is string && data.name.size() <= 150 &&
+             data.price is string && data.price.size() <= 50 &&
+             data.year is string && data.year.size() <= 10 &&
+             data.km is string && data.km.size() <= 20 &&
+             data.fuel is string && data.fuel.size() <= 50 &&
+             data.gearbox is string && data.gearbox.size() <= 50 &&
+             data.img is string && data.img.size() <= 500 &&
+             data.createdAt == request.time &&
+             data.updatedAt == request.time;
+    }
+
+    function isValidDetailingGallery(data) {
+      return data.keys().hasAll(['beforeImg', 'afterImg', 'beforeDesc', 'afterDesc', 'createdAt', 'updatedAt']) &&
+             data.keys().size() == 6 &&
+             data.beforeImg is string && data.beforeImg.size() <= 500 &&
+             data.afterImg is string && data.afterImg.size() <= 500 &&
+             data.beforeDesc is string && data.beforeDesc.size() <= 200 &&
+             data.afterDesc is string && data.afterDesc.size() <= 200 &&
+             data.createdAt == request.time &&
+             data.updatedAt == request.time;
+    }
+
+    // --- Collections ---
+
+    match /admins/{userId} {
+      allow read: if isAdmin() && isValidId(userId);
+      allow list: if isAdmin();
+      allow write: if false; // Admins managed securely outside clients or strictly by super-admin
+    }
+
+    match /contactRequests/{requestId} {
+      // Anyone can submit a contact request.
+      allow create: if isValidId(requestId) && isValidContactRequest(incoming());
+      // Only admins can read, update, or delete.
+      allow read: if isAdmin() && isValidId(requestId);
+      allow list: if isAdmin();
+      allow delete: if isAdmin() && isValidId(requestId);
+      allow update: if isAdmin() && isValidId(requestId) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']) &&
+                       incoming().status in ['new', 'read', 'resolved'] &&
+                       incoming().updatedAt == request.time;
+    }
+
+    match /importRequests/{requestId} {
+      allow create: if isValidId(requestId) && isValidImportRequest(incoming());
+      allow read: if isAdmin() && isValidId(requestId);
+      allow list: if isAdmin();
+      allow delete: if isAdmin() && isValidId(requestId);
+      allow update: if isAdmin() && isValidId(requestId) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']) &&
+                       incoming().status in ['new', 'read', 'resolved'] &&
+                       incoming().updatedAt == request.time;
+    }
+
+    match /estimationRequests/{requestId} {
+      allow create: if isValidId(requestId) && isValidEstimationRequest(incoming());
+      allow read: if isAdmin() && isValidId(requestId);
+      allow list: if isAdmin();
+      allow delete: if isAdmin() && isValidId(requestId);
+      allow update: if isAdmin() && isValidId(requestId) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']) &&
+                       incoming().status in ['new', 'read', 'resolved'] &&
+                       incoming().updatedAt == request.time;
+    }
+
+    match /inventory/{itemId} {
+      allow read: if isValidId(itemId);
+      allow list: if true;
+      allow create: if isAdmin() && isValidId(itemId) && isValidInventoryItem(incoming());
+      allow delete: if isAdmin() && isValidId(itemId);
+      allow update: if isAdmin() && isValidId(itemId) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['name', 'price', 'year', 'km', 'fuel', 'gearbox', 'img', 'updatedAt']) &&
+                       incoming().name is string && incoming().name.size() <= 150 &&
+                       incoming().price is string && incoming().price.size() <= 50 &&
+                       incoming().year is string && incoming().year.size() <= 10 &&
+                       incoming().km is string && incoming().km.size() <= 20 &&
+                       incoming().fuel is string && incoming().fuel.size() <= 50 &&
+                       incoming().gearbox is string && incoming().gearbox.size() <= 50 &&
+                       incoming().img is string && incoming().img.size() <= 500 &&
+                       incoming().updatedAt == request.time;
+    }
+
+    match /detailingGalleries/{galleryId} {
+      allow read: if isValidId(galleryId);
+      allow list: if true;
+      allow create: if isAdmin() && isValidId(galleryId) && isValidDetailingGallery(incoming());
+      allow delete: if isAdmin() && isValidId(galleryId);
+      allow update: if isAdmin() && isValidId(galleryId) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['beforeImg', 'afterImg', 'beforeDesc', 'afterDesc', 'updatedAt']) &&
+                       incoming().beforeImg is string && incoming().beforeImg.size() <= 500 &&
+                       incoming().afterImg is string && incoming().afterImg.size() <= 500 &&
+                       incoming().beforeDesc is string && incoming().beforeDesc.size() <= 200 &&
+                       incoming().afterDesc is string && incoming().afterDesc.size() <= 200 &&
+                       incoming().updatedAt == request.time;
+    }
+  }
+}

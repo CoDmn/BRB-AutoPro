@@ -10,19 +10,25 @@ import Import from "./pages/Import";
 import BuySell from "./pages/BuySell";
 import Detailing from "./pages/Detailing";
 import Contact from "./pages/Contact";
+import Admin from "./pages/Admin";
 
 export default function App() {
   return (
     <Router>
-      <Layout>
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/import" element={<Import />} />
-          <Route path="/buy-sell" element={<BuySell />} />
-          <Route path="/detailing" element={<Detailing />} />
-          <Route path="/contact" element={<Contact />} />
-        </Routes>
-      </Layout>
+      <Routes>
+        <Route path="/admin" element={<Admin />} />
+        <Route path="*" element={
+          <Layout>
+            <Routes>
+              <Route path="/" element={<Home />} />
+              <Route path="/import" element={<Import />} />
+              <Route path="/buy-sell" element={<BuySell />} />
+              <Route path="/detailing" element={<Detailing />} />
+              <Route path="/contact" element={<Contact />} />
+            </Routes>
+          </Layout>
+        } />
+      </Routes>
     </Router>
   );
 }

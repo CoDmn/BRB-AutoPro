@@ -1,6 +1,38 @@
+import React, { useState } from "react";
 import { MapPin, Phone, Mail, Clock } from "lucide-react";
+import { submitContactRequest } from "../lib/firebaseUtils";
 
 export default function Contact() {
+  const [formData, setFormData] = useState({
+    subject: "Demande d'information générale",
+    name: "",
+    phone: "",
+    email: "",
+    message: ""
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    try {
+      await submitContactRequest(formData);
+      alert('Message envoyé avec succès. Nous vous contacterons rapidement.');
+      setFormData({
+        subject: "Demande d'information générale",
+        name: "",
+        phone: "",
+        email: "",
+        message: ""
+      });
+    } catch (error) {
+      console.error(error);
+      alert('Une erreur est survenue lors de l\'envoi du message.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <div className="bg-anthracite min-h-screen">
       {/* Intro section */}
@@ -70,10 +102,14 @@ export default function Contact() {
               <h2 className="text-2xl font-sans font-black uppercase text-white mb-2">Envoyez-nous un message</h2>
               <p className="text-white/50 text-sm mb-8 leading-[1.6]">Nous traitons vos demandes d'import, d'achat et de prestation detailing sous 24h ouvrées.</p>
 
-              <form className="space-y-6" onSubmit={(e) => { e.preventDefault(); alert('Message envoyé'); }}>
+              <form className="space-y-6" onSubmit={handleSubmit}>
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-[1px] text-white/50 mb-2">Sujet</label>
-                  <select className="w-full px-4 py-3 bg-anthracite text-white border border-white/10 focus:outline-none focus:border-primary transition-colors">
+                  <select 
+                    value={formData.subject}
+                    onChange={(e) => setFormData({...formData, subject: e.target.value})}
+                    className="w-full px-4 py-3 bg-anthracite text-white border border-white/10 focus:outline-none focus:border-primary transition-colors"
+                  >
                     <option>Demande d'information générale</option>
                     <option>Projet d'importation</option>
                     <option>Véhicule en vente</option>
@@ -83,23 +119,47 @@ export default function Contact() {
                 <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                    <div>
                       <label className="block text-xs font-bold uppercase tracking-[1px] text-white/50 mb-2">Nom / Prénom</label>
-                      <input type="text" required className="w-full px-4 py-3 bg-anthracite text-white border border-white/10 focus:outline-none focus:border-primary transition-colors" />
+                      <input 
+                        type="text" 
+                        required 
+                        value={formData.name}
+                        onChange={(e) => setFormData({...formData, name: e.target.value})}
+                        className="w-full px-4 py-3 bg-anthracite text-white border border-white/10 focus:outline-none focus:border-primary transition-colors" 
+                      />
                    </div>
                    <div>
                       <label className="block text-xs font-bold uppercase tracking-[1px] text-white/50 mb-2">Téléphone</label>
-                      <input type="tel" required className="w-full px-4 py-3 bg-anthracite text-white border border-white/10 focus:outline-none focus:border-primary transition-colors" />
+                      <input 
+                        type="tel" 
+                        required 
+                        value={formData.phone}
+                        onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                        className="w-full px-4 py-3 bg-anthracite text-white border border-white/10 focus:outline-none focus:border-primary transition-colors" 
+                      />
                    </div>
                 </div>
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-[1px] text-white/50 mb-2">Email</label>
-                  <input type="email" required className="w-full px-4 py-3 bg-anthracite text-white border border-white/10 focus:outline-none focus:border-primary transition-colors" />
+                  <input 
+                    type="email" 
+                    required 
+                    value={formData.email}
+                    onChange={(e) => setFormData({...formData, email: e.target.value})}
+                    className="w-full px-4 py-3 bg-anthracite text-white border border-white/10 focus:outline-none focus:border-primary transition-colors" 
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-[1px] text-white/50 mb-2">Votre Message</label>
-                  <textarea rows={5} required className="w-full px-4 py-3 bg-anthracite text-white border border-white/10 focus:outline-none focus:border-primary resize-none transition-colors"></textarea>
+                  <textarea 
+                    rows={5} 
+                    required 
+                    value={formData.message}
+                    onChange={(e) => setFormData({...formData, message: e.target.value})}
+                    className="w-full px-4 py-3 bg-anthracite text-white border border-white/10 focus:outline-none focus:border-primary resize-none transition-colors"
+                  ></textarea>
                 </div>
-                <button type="submit" className="w-full bg-primary hover:bg-primary-hover text-white py-4 font-bold uppercase tracking-[1px] text-xs transition-colors flex justify-center items-center gap-2 rounded">
-                  <Mail className="w-5 h-5"/> Envoyer ma demande
+                <button type="submit" disabled={isSubmitting} className="w-full bg-primary hover:bg-primary-hover text-white py-4 font-bold uppercase tracking-[1px] text-xs transition-colors flex justify-center items-center gap-2 rounded disabled:opacity-50">
+                  <Mail className="w-5 h-5"/> {isSubmitting ? "Envoi en cours..." : "Envoyer ma demande"}
                 </button>
               </form>
             </div>

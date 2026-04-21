@@ -1,6 +1,7 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { Filter, Search, ShieldCheck } from "lucide-react";
 import { Link } from "react-router-dom";
+import { submitEstimationRequest } from "../lib/firebaseUtils";
 
 const INVENTORY = [
   { id: 1, name: "Porsche 911 (992) Carrera S", price: "135 000 â‚¬", year: "2020", km: "35 000 km", fuel: "Essence", gearbox: "Auto", img: "https://images.unsplash.com/photo-1503376713251-4045fbc555fa?q=80&w=800&auto=format&fit=crop" },
@@ -12,6 +13,22 @@ const INVENTORY = [
 export default function BuySell() {
   const [activeTab, setActiveTab] = useState<"buy" | "sell">("buy");
   const [sellForm, setSellForm] = useState({ brand: "", model: "", year: "", km: "", email: "" });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSellSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    try {
+      await submitEstimationRequest(sellForm);
+      alert("Estimation envoyée avec succès !");
+      setSellForm({ brand: "", model: "", year: "", km: "", email: "" });
+    } catch (error) {
+      console.error(error);
+      alert("Une erreur est survenue lors de l'envoi.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <div className="bg-anthracite min-h-screen">
@@ -113,7 +130,7 @@ export default function BuySell() {
                   <p className="text-white/50 text-sm">Reprise cash ou dépôt-vente. Nous valorisons votre passion auto.</p>
                 </div>
 
-                <form onSubmit={(e) => { e.preventDefault(); alert("Estimation envoyée !"); setSellForm({brand:"", model:"", year:"", km:"", email:""}) }} className="space-y-6">
+                <form onSubmit={handleSellSubmit} className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                       <label className="block text-xs font-bold uppercase tracking-[1px] text-white/50 mb-2">Marque</label>
@@ -168,8 +185,8 @@ export default function BuySell() {
                       className="w-full px-4 py-3 bg-anthracite text-white border border-white/10 focus:border-primary focus:outline-none transition-colors" 
                     />
                   </div>
-                  <button type="submit" className="w-full bg-primary hover:bg-primary-hover text-white py-4 font-bold uppercase tracking-[1px] text-xs transition-colors rounded">
-                    Faire estimer mon véhicule
+                  <button type="submit" disabled={isSubmitting} className="w-full bg-primary hover:bg-primary-hover text-white py-4 font-bold uppercase tracking-[1px] text-xs transition-colors rounded disabled:opacity-50">
+                    {isSubmitting ? "Envoi en cours..." : "Faire estimer mon véhicule"}
                   </button>
                   <p className="text-center text-[11px] uppercase tracking-wider text-white/30 mt-4">Nous vous répondrons avec l'estimation la plus juste selon les prix du marché Nîmois/National.</p>
                 </form>
