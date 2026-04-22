@@ -96,8 +96,8 @@
       },
       "required": ["beforeImg", "afterImg", "beforeDesc", "afterDesc", "createdAt", "updatedAt"]
     },
-    "Booking": {
-      "title": "Booking",
+    "Appointment": {
+      "title": "Appointment",
       "description": "An appointment booking.",
       "type": "object",
       "properties": {
@@ -108,8 +108,9 @@
         "carModel": { "type": "string", "maxLength": 200 },
         "date": { "type": "string", "format": "date-time" },
         "service": { "type": "string" },
-        "status": { "type": "string", "enum": ["pending", "accepted", "refused"] },
+        "status": { "type": "string", "enum": ["pending", "accepted", "refused", "cancelled"] },
         "message": { "type": "string" },
+        "googleEventId": { "type": "string" },
         "createdAt": { "type": "timestamp" },
         "updatedAt": { "type": "timestamp" }
       },
@@ -151,8 +152,8 @@
       "schema": "Admin",
       "description": "Stores authorized admin users"
     },
-    "bookings/{bookingId}": {
-      "schema": "Booking",
+    "appointments/{appointmentId}": {
+      "schema": "Appointment",
       "description": "Stores appointment bookings"
     }
   }

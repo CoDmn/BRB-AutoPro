@@ -22,7 +22,8 @@ import { fr } from 'date-fns/locale';
 export default function Admin() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'requests' | 'inventory' | 'gallery' | 'bookings' | 'settings'>('requests');
+  const [activeTab, setActiveTab] = useState<'requests' | 'inventory' | 'gallery' | 'appointments' | 'settings'>('requests');
+  const [processingId, setProcessingId] = useState<string | null>(null);
   
   // Data states
   const [contactRequests, setContactRequests] = useState<any[]>([]);
@@ -30,7 +31,7 @@ export default function Admin() {
   const [estimationRequests, setEstimationRequests] = useState<any[]>([]);
   const [inventory, setInventory] = useState<any[]>([]);
   const [gallery, setGallery] = useState<any[]>([]);
-  const [bookings, setBookings] = useState<any[]>([]);
+  const [appointments, setAppointments] = useState<any[]>([]);
 
   // Form states
   const [newCar, setNewCar] = useState({ 
@@ -63,7 +64,7 @@ export default function Admin() {
       onSnapshot(query(collection(db, 'estimationRequests'), orderBy('createdAt', 'desc')), (snap) => setEstimationRequests(snap.docs.map(d => ({ id: d.id, ...d.data() })))),
       onSnapshot(query(collection(db, 'inventory'), orderBy('createdAt', 'desc')), (snap) => setInventory(snap.docs.map(d => ({ id: d.id, ...d.data() })))),
       onSnapshot(query(collection(db, 'detailingGalleries'), orderBy('createdAt', 'desc')), (snap) => setGallery(snap.docs.map(d => ({ id: d.id, ...d.data() })))),
-      onSnapshot(query(collection(db, 'bookings'), orderBy('createdAt', 'desc')), (snap) => setBookings(snap.docs.map(d => ({ id: d.id, ...d.data() })))),
+      onSnapshot(query(collection(db, 'appointments'), orderBy('createdAt', 'desc')), (snap) => setAppointments(snap.docs.map(d => ({ id: d.id, ...d.data() })))),
     ];
 
     return () => unsubs.forEach(unsub => unsub());
@@ -71,8 +72,14 @@ export default function Admin() {
 
   const handleLogin = async () => {
     const provider = new GoogleAuthProvider();
+    provider.addScope('https://www.googleapis.com/auth/calendar');
+    provider.addScope('https://www.googleapis.com/auth/gmail.send');
     try {
-      await signInWithPopup(auth, provider);
+      const result = await signInWithPopup(auth, provider);
+      const credential = GoogleAuthProvider.credentialFromResult(result);
+      if (credential && credential.accessToken) {
+        localStorage.setItem('google_access_token', credential.accessToken);
+      }
     } catch (error: any) {
       console.error(error);
       alert("Erreur lors de la connexion : " + error.message + "\n\nSi vous êtes dans l'aperçu, essayez d'ouvrir l'application dans un nouvel onglet.");
@@ -174,15 +181,219 @@ export default function Admin() {
     }
   };
 
-  const handleUpdateBookingStatus = async (id: string, status: 'accepted' | 'refused') => {
+  const sendEmailViaGmail = async (to: string, subject: string, body: string) => {
+    const token = localStorage.getItem('google_access_token');
+    if (!token) return;
+
+    const emailContent = [
+      'To: ' + to,
+      'Subject: ' + subject,
+      'MIME-Version: 1.0',
+      'Content-Type: text/html; charset=utf-8',
+      '',
+      body
+    ].join('\n');
+
+    const base64Content = btoa(unescape(encodeURIComponent(emailContent))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
     try {
-      await updateBookingStatus(id, status);
-      // Here we could add a call to an edge function to send emails if we had one.
-      // For now we'll just alert.
-      alert(status === 'accepted' ? "Rendez-vous validé ! Un mail (simulé) a été envoyé au client." : "Rendez-vous refusé.");
+      await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ raw: base64Content }),
+      });
+    } catch (error) {
+      console.error("Error sending email:", error);
+    }
+  };
+
+  const createGoogleCalendarEvent = async (appointment: any) => {
+    const token = localStorage.getItem('google_access_token');
+    if (!token) {
+      console.warn("No Google Access Token found. Calendar event not created.");
+      return null;
+    }
+
+    const startTime = new Date(appointment.date);
+    const endTime = new Date(startTime.getTime() + 2 * 60 * 60 * 1000); // 2 hours duration
+
+    const event = {
+      summary: `🚗 RDV Detailing: ${appointment.firstName} ${appointment.lastName}`,
+      description: `
+Prestation: ${appointment.service}
+Véhicule: ${appointment.carModel}
+Client: ${appointment.firstName} ${appointment.lastName}
+Téléphone: ${appointment.phone}
+Email: ${appointment.email}
+
+---
+Contact BRB Auto Pro:
+Téléphone: 07 81 78 73 60
+Adresse: 6 Chemin des Moulins, 30300 Beaucaire, France
+Email: brbautopro@gmail.com
+      `.trim(),
+      start: {
+        dateTime: startTime.toISOString(),
+      },
+      end: {
+        dateTime: endTime.toISOString(),
+      },
+      reminders: {
+        useDefault: true
+      },
+      conferenceData: {
+        createRequest: {
+          requestId: Math.random().toString(36).substring(7),
+          conferenceSolutionKey: { type: 'hangoutsMeet' }
+        }
+      }
+    };
+
+    try {
+      const response = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events?conferenceDataVersion=1', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(event),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log("Calendar event created successfully");
+        return { 
+          id: data.id, 
+          hangoutLink: data.hangoutLink 
+        };
+      } else {
+        const errorData = await response.json();
+        console.error("Failed to create calendar event:", errorData);
+        return null;
+      }
+    } catch (error) {
+      console.error("Error creating Google Calendar event:", error);
+      return null;
+    }
+  };
+
+  const deleteGoogleCalendarEvent = async (eventId: string) => {
+    const token = localStorage.getItem('google_access_token');
+    if (!token) {
+      alert("Erreur: Jeton d'accès Google manquant. Veuillez vous déconnecter et vous reconnecter.");
+      return;
+    }
+
+    try {
+      const response = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${eventId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      if (!response.ok) {
+        const err = await response.json();
+        console.error("Failed to delete event:", err);
+      }
+    } catch (error) {
+      console.error("Error deleting calendar event:", error);
+    }
+  };
+
+  const handleUpdateBookingStatus = async (id: string, status: 'accepted' | 'refused' | 'cancelled') => {
+    console.log(`Updating booking ${id} to ${status}`);
+    setProcessingId(id);
+    try {
+      const appointment = appointments.find(a => a.id === id);
+      if (!appointment) {
+        console.error("Appointment not found in state:", id);
+        setProcessingId(null);
+        return;
+      }
+
+      const dateStr = format(new Date(appointment.date), "dd/MM/yyyy", { locale: fr });
+      const timeStr = format(new Date(appointment.date), "HH'h'mm", { locale: fr });
+      const logoHtml = '<img src="https://brbautopro.fr/logo.jpg" alt="BRB Auto Pro" style="width: 150px; height: auto; display: block; margin-top: 20px;" />';
+
+      if (status === 'accepted') {
+        const eventData = await createGoogleCalendarEvent(appointment);
+        const googleEventId = eventData?.id || '';
+        const hangoutLink = eventData?.hangoutLink || '';
+
+        await updateBookingStatus(id, 'accepted', googleEventId);
+
+        const emailBody = `
+          <div style="font-family: sans-serif; color: #333; line-height: 1.6;">
+            <p>Objet : Confirmation de votre séance de Detailing - ${dateStr} 🏁</p>
+            <p>Bonjour ${appointment.firstName},</p>
+            <p>C'est confirmé ! Nous avons bien validé votre rendez-vous pour prendre soin de votre <strong>${appointment.carModel}</strong>.</p>
+            <p>Voici le récapitulatif de votre séance :</p>
+            <ul>
+              <li><strong>Prestation :</strong> ${appointment.service}</li>
+              <li><strong>Date :</strong> ${dateStr}</li>
+              <li><strong>Heure de dépôt :</strong> ${timeStr}</li>
+              <li><strong>Lieu :</strong> 6 Chemin des Moulins, 30300 Beaucaire, France</li>
+            </ul>
+            ${hangoutLink ? `<p><strong>Lien de rendez-vous (Google Meet) :</strong> <a href="${hangoutLink}">${hangoutLink}</a></p>` : ''}
+            <p><strong>Quelques précisions pour le bon déroulement de la prestation :</strong></p>
+            <p>Durée : Prévoyez environ 2h d'immobilisation pour un résultat optimal.</p>
+            <p>Préparation : Nous vous remercions de bien vouloir retirer vos objets personnels de l'habitacle avant notre intervention.</p>
+            <p>Si vous avez la moindre question ou un empêchement, merci de nous prévenir au moins 24h à l'avance au 07 81 78 73 60.</p>
+            <p>Nous avons hâte de redonner tout son éclat à votre véhicule !</p>
+            <p>À très vite,</p>
+            <p>Mathis BORDES BUENO<br>BRB Auto Pro</p>
+            ${logoHtml}
+          </div>
+        `.trim();
+        await sendEmailViaGmail(appointment.email, `Confirmation de votre séance de Detailing - ${dateStr} 🏁`, emailBody);
+        alert("Rendez-vous validé, ajouté à l'agenda et email envoyé !");
+      } else if (status === 'refused') {
+        await updateBookingStatus(id, 'refused');
+        const emailBody = `
+          <div style="font-family: sans-serif; color: #333; line-height: 1.6;">
+            <p>Objet : À propos de votre demande de rendez-vous - BRB Auto Pro</p>
+            <p>Bonjour ${appointment.firstName},</p>
+            <p>Je vous remercie de l'intérêt que vous portez à nos services de detailing pour votre <strong>${appointment.carModel}</strong>.</p>
+            <p>Après étude de votre demande, je ne suis malheureusement pas en mesure de valider votre rendez-vous pour la date du ${dateStr} à ${timeStr}.</p>
+            <p>Nous serions ravis de prendre soin de votre véhicule à une autre date. Je vous invite à consulter nos prochaines disponibilités directement sur notre site ou à me recontacter par téléphone au 07 81 78 73 60.</p>
+            <p>Merci de votre compréhension.</p>
+            <p>Cordialement,</p>
+            <p>Mathis BORDES BUENO<br>BRB Auto Pro</p>
+            ${logoHtml}
+          </div>
+        `.trim();
+        await sendEmailViaGmail(appointment.email, "À propos de votre demande de rendez-vous - BRB Auto Pro", emailBody);
+        alert("Rendez-vous refusé et email envoyé.");
+      } else if (status === 'cancelled') {
+        if (appointment.googleEventId) {
+          await deleteGoogleCalendarEvent(appointment.googleEventId);
+        }
+        await updateBookingStatus(id, 'cancelled');
+        const emailBody = `
+          <div style="font-family: sans-serif; color: #333; line-height: 1.6;">
+            <p>Objet : ANNULATION / REPORT de votre rendez-vous - ${dateStr}</p>
+            <p>Bonjour ${appointment.firstName},</p>
+            <p>Nous vous contactons pour vous informer que nous sommes contraints d'annuler votre séance de detailing prévue le ${dateStr} à ${timeStr} pour votre <strong>${appointment.carModel}</strong>.</p>
+            <p>En raison d'un imprévu, nous ne pourrons pas vous recevoir dans les conditions de qualité optimales que nous exigeons.</p>
+            <p>Nous sommes sincèrement désolés pour ce contretemps. Votre satisfaction et le soin apporté à votre véhicule restent notre priorité.</p>
+            <p>Je vous propose de replanifier votre séance sur notre site web.</p>
+            <p>Je reste également votre entière disposition pour en discuter de vive voix au 07 81 78 73 60.</p>
+            <p>Bien cordialement,</p>
+            <p>Mathis BORDES BUENO<br>BRB Auto Pro</p>
+            ${logoHtml}
+          </div>
+        `.trim();
+        await sendEmailViaGmail(appointment.email, `ANNULATION / REPORT de votre rendez-vous - ${dateStr}`, emailBody);
+        alert("Rendez-vous annulé, supprimé de l'agenda et email envoyé.");
+      }
     } catch (err: any) {
       console.error("Error updating booking status:", err);
       alert("Erreur lors de la mise à jour du statut : " + (err.message || "Erreur inconnue"));
+    } finally {
+      setProcessingId(null);
     }
   };
 
@@ -310,45 +521,64 @@ export default function Admin() {
 
         <div className="flex gap-4 mb-8">
           <button onClick={() => setActiveTab('requests')} className={`px-4 py-2 uppercase font-bold text-xs tracking-wider border-b-2 transition-colors ${activeTab === 'requests' ? 'border-primary text-primary' : 'border-transparent text-white/50 hover:text-white'}`}>Demandes Client</button>
-          <button onClick={() => setActiveTab('bookings')} className={`px-4 py-2 uppercase font-bold text-xs tracking-wider border-b-2 transition-colors ${activeTab === 'bookings' ? 'border-primary text-primary' : 'border-transparent text-white/50 hover:text-white'}`}>Rendez-vous</button>
+          <button onClick={() => setActiveTab('appointments')} className={`px-4 py-2 uppercase font-bold text-xs tracking-wider border-b-2 transition-colors ${activeTab === 'appointments' ? 'border-primary text-primary' : 'border-transparent text-white/50 hover:text-white'}`}>Rendez-vous</button>
           <button onClick={() => setActiveTab('inventory')} className={`px-4 py-2 uppercase font-bold text-xs tracking-wider border-b-2 transition-colors ${activeTab === 'inventory' ? 'border-primary text-primary' : 'border-transparent text-white/50 hover:text-white'}`}>Inventaire</button>
           <button onClick={() => setActiveTab('gallery')} className={`px-4 py-2 uppercase font-bold text-xs tracking-wider border-b-2 transition-colors ${activeTab === 'gallery' ? 'border-primary text-primary' : 'border-transparent text-white/50 hover:text-white'}`}>Galerie Detailing</button>
           <button onClick={() => setActiveTab('settings')} className={`px-4 py-2 uppercase font-bold text-xs tracking-wider border-b-2 transition-colors ${activeTab === 'settings' ? 'border-primary text-primary' : 'border-transparent text-white/50 hover:text-white'}`}>Paramètres</button>
         </div>
 
-        {activeTab === 'bookings' && (
+        {activeTab === 'appointments' && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fade-in">
             <div className="bg-darker rounded border border-white/10 p-6">
-              <h2 className="text-xl font-sans font-black uppercase mb-6 text-yellow-500">Demandes en attente ({bookings.filter(b => b.status === 'pending').length})</h2>
+              <h2 className="text-xl font-sans font-black uppercase mb-6 text-yellow-500">Demandes en attente ({appointments.filter(b => b.status === 'pending').length})</h2>
               <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2">
-                {bookings.filter(b => b.status === 'pending').map(booking => (
-                  <div key={booking.id} className="bg-anthracite p-4 rounded border border-white/5">
+                {appointments.filter(b => b.status === 'pending').map(appointment => (
+                  <div key={appointment.id} className="bg-anthracite p-4 rounded border border-white/5">
                     <div className="flex justify-between items-start mb-2">
-                      <h3 className="font-bold text-sm uppercase">{booking.firstName} {booking.lastName}</h3>
+                      <h3 className="font-bold text-sm uppercase">{appointment.firstName} {appointment.lastName}</h3>
                       <span className="text-[10px] uppercase font-bold bg-yellow-500/20 text-yellow-500 px-2 py-1 rounded">En attente</span>
                     </div>
-                    <p className="text-xs text-white/70 mb-2">{booking.email} • {booking.phone}</p>
-                    <p className="text-xs text-primary mb-2 font-bold uppercase">{booking.service} - {booking.carModel}</p>
-                    <p className="text-sm font-bold mb-4">{format(new Date(booking.date), "EEEE d MMMM yyyy 'à' HH'h'mm", { locale: fr })}</p>
+                    <p className="text-xs text-white/70 mb-2">{appointment.email} • {appointment.phone}</p>
+                    <p className="text-xs text-primary mb-2 font-bold uppercase">{appointment.service} - {appointment.carModel}</p>
+                    <p className="text-sm font-bold mb-4">{format(new Date(appointment.date), "EEEE d MMMM yyyy 'à' HH'h'mm", { locale: fr })}</p>
                     <div className="flex gap-2">
-                      <button onClick={() => handleUpdateBookingStatus(booking.id, 'accepted')} className="flex-1 bg-green-600 hover:bg-green-500 text-white py-2 rounded text-[10px] font-bold uppercase tracking-wider transition-colors">Accepter</button>
-                      <button onClick={() => handleUpdateBookingStatus(booking.id, 'refused')} className="flex-1 bg-red-600/20 hover:bg-red-600/40 text-red-500 py-2 rounded text-[10px] font-bold uppercase tracking-wider transition-colors">Refuser</button>
+                      <button onClick={() => handleUpdateBookingStatus(appointment.id, 'accepted')} className="flex-1 bg-green-600 hover:bg-green-500 text-white py-2 rounded text-[10px] font-bold uppercase tracking-wider transition-colors">Accepter</button>
+                      <button onClick={() => handleUpdateBookingStatus(appointment.id, 'refused')} className="flex-1 bg-red-600/20 hover:bg-red-600/40 text-red-500 py-2 rounded text-[10px] font-bold uppercase tracking-wider transition-colors">Refuser</button>
                     </div>
                   </div>
                 ))}
-                {bookings.filter(b => b.status === 'pending').length === 0 && <p className="text-white/30 italic text-sm">Aucune demande en attente.</p>}
+                {appointments.filter(b => b.status === 'pending').length === 0 && <p className="text-white/30 italic text-sm">Aucune demande en attente.</p>}
               </div>
             </div>
             <div className="bg-darker rounded border border-white/10 p-6">
-              <h2 className="text-xl font-sans font-black uppercase mb-6 text-green-500">Rendez-vous validés ({bookings.filter(b => b.status === 'accepted').length})</h2>
+              <h2 className="text-xl font-sans font-black uppercase mb-6 text-green-500">Rendez-vous validés ({appointments.filter(b => b.status === 'accepted').length})</h2>
               <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2">
-                {bookings.filter(b => b.status !== 'pending').map(booking => (
-                  <div key={booking.id} className={`bg-anthracite p-4 rounded border border-white/5 ${booking.status === 'accepted' ? 'border-l-4 border-l-green-500' : 'opacity-50 border-l-4 border-l-red-500'}`}>
+                {appointments.filter(b => b.status === 'accepted' || b.status === 'cancelled').map(appointment => (
+                  <div key={appointment.id} className={`bg-anthracite p-4 rounded border border-white/5 ${appointment.status === 'accepted' ? 'border-l-4 border-l-green-500' : 'opacity-50 border-l-4 border-l-red-500'}`}>
                     <div className="flex justify-between items-start mb-1">
-                      <h3 className="font-bold text-sm uppercase">{booking.firstName} {booking.lastName}</h3>
-                      <span className={`text-[10px] uppercase font-bold px-2 py-1 rounded ${booking.status === 'accepted' ? 'bg-green-500/20 text-green-500' : 'bg-red-500/20 text-red-500'}`}>{booking.status === 'accepted' ? 'Validé' : 'Refusé'}</span>
+                      <h3 className="font-bold text-sm uppercase">{appointment.firstName} {appointment.lastName}</h3>
+                      <div className="flex flex-col items-end gap-1">
+                        <span className={`text-[10px] uppercase font-bold px-2 py-1 rounded ${appointment.status === 'accepted' ? 'bg-green-500/20 text-green-500' : 'bg-red-500/20 text-red-500'}`}>
+                          {appointment.status === 'accepted' ? 'Validé' : 'Annulé'}
+                        </span>
+                        {appointment.status === 'accepted' && (
+                          <button 
+                            disabled={processingId === appointment.id}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              if (window.confirm("Êtes-vous sûr de vouloir annuler ce rendez-vous ? Un email d'annulation sera envoyé au client.")) {
+                                handleUpdateBookingStatus(appointment.id, 'cancelled');
+                              }
+                            }}
+                            className={`text-[10px] uppercase font-bold transition-all ${processingId === appointment.id ? 'text-white/20' : 'text-red-500 hover:underline'}`}
+                          >
+                            {processingId === appointment.id ? 'Annulation...' : 'Annuler le rendez-vous'}
+                          </button>
+                        )}
+                      </div>
                     </div>
-                    <p className="text-xs text-white/50">{booking.carModel} • {format(new Date(booking.date), "d MMM yyyy HH'h'mm", { locale: fr })}</p>
+                    <p className="text-xs text-white/50">{appointment.carModel} • {format(new Date(appointment.date), "d MMM yyyy HH'h'mm", { locale: fr })}</p>
                   </div>
                 ))}
               </div>

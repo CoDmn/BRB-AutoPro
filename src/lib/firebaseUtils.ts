@@ -81,7 +81,7 @@ export async function deleteDetailingGallery(id: string) {
 }
 
 export async function submitBooking(data: any) {
-  const newRef = doc(collection(db, 'bookings'));
+  const newRef = doc(collection(db, 'appointments'));
   await setDoc(newRef, {
     ...data,
     status: 'pending',
@@ -90,10 +90,13 @@ export async function submitBooking(data: any) {
   });
 }
 
-export async function updateBookingStatus(id: string, status: 'accepted' | 'refused') {
-  const ref = doc(db, 'bookings', id);
-  await setDoc(ref, {
+export async function updateBookingStatus(id: string, status: 'accepted' | 'refused' | 'cancelled', googleEventId?: string) {
+  const ref = doc(db, 'appointments', id);
+  const data: any = {
     status,
     updatedAt: serverTimestamp()
-  }, { merge: true });
+  };
+  if (googleEventId) data.googleEventId = googleEventId;
+  
+  await setDoc(ref, data, { merge: true });
 }

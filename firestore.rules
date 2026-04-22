@@ -100,7 +100,7 @@ service cloud.firestore {
              data.updatedAt == request.time;
     }
 
-    function isValidBooking(data) {
+    function isValidAppointment(data) {
       let requiredFields = ['firstName', 'lastName', 'phone', 'email', 'carModel', 'date', 'status', 'createdAt', 'updatedAt'];
       return data.keys().hasAll(requiredFields) &&
              data.firstName is string && data.firstName.size() <= 100 &&
@@ -109,7 +109,8 @@ service cloud.firestore {
              data.email is string && data.email.size() <= 100 &&
              data.carModel is string && data.carModel.size() <= 200 &&
              data.date is string &&
-             data.status in ['pending', 'accepted', 'refused'] &&
+             data.status in ['pending', 'accepted', 'refused', 'cancelled'] &&
+             (!('googleEventId' in data) || data.googleEventId is string) &&
              data.updatedAt == request.time;
     }
 
@@ -180,8 +181,8 @@ service cloud.firestore {
       );
     }
 
-    match /bookings/{bookingId} {
-      allow create: if isValidId(bookingId) && isValidBooking(incoming()) && incoming().createdAt == request.time;
+    match /appointments/{appointmentId} {
+      allow create: if isValidId(appointmentId) && isValidAppointment(incoming()) && incoming().createdAt == request.time;
       allow read, list, delete, update: if isAdmin();
     }
   }
