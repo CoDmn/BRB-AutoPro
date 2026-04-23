@@ -36,9 +36,19 @@ export default function Home() {
   return (
     <div className="flex flex-col min-h-screen">
       {/* Hero Section */}
-      <section className="relative h-[80vh] min-h-[600px] flex items-center overflow-hidden bg-anthracite">
-        <div className="absolute right-0 top-0 w-2/3 h-full bg-cover bg-center z-0" style={{ backgroundImage: "url('https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&q=80&w=1000')" }} />
-        <div className="absolute inset-0 bg-gradient-to-r from-darker from-40% to-transparent z-[1]" />
+      <section className="relative h-[80vh] min-h-[600px] flex items-center overflow-hidden bg-darker">
+        {/* Background Image */}
+        <div className="absolute inset-0 z-0">
+          <img 
+            src="https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&q=80&w=2000" 
+            alt="Porsche 911 BRB Auto Pro" 
+            className="w-full h-full object-cover object-right md:object-center opacity-60 md:opacity-100"
+            referrerPolicy="no-referrer"
+          />
+        </div>
+        
+        {/* Gradient Overlay */}
+        <div className="absolute inset-0 bg-gradient-to-r from-darker via-darker/80 to-transparent z-[1]" />
         
         <div className="container mx-auto px-4 relative z-10 w-full animate-fade-in flex flex-col justify-center">
           <div className="max-w-2xl">
