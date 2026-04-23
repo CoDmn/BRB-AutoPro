@@ -272,7 +272,6 @@ export default function Admin() {
         <p style="margin:0; color: #666;">6 Chemin des Moulins, 30300 Beaucaire</p>
         <p style="margin:0; color: #666;">Tél: 07 81 78 73 60</p>
         <p style="margin:0; color: #666;">Site: <a href="https://brbautopro.fr">brbautopro.fr</a></p>
-        <img src="https://brbautopro.fr/logo.jpg" alt="BRB Auto Pro" style="width: 150px; height: auto; margin-top: 15px;" />
       `;
 
       const fullBody = `
@@ -308,7 +307,7 @@ export default function Admin() {
       // Better logo handling with fallback to working demo URL if main logo fails
       const logoUrl = "https://brbautopro.fr/logo.jpg";
       const siteUrl = window.location.origin;
-      const logoHtml = `<img src="${logoUrl}" alt="BRB Auto Pro" style="width: 150px; height: auto; display: block; margin-top: 20px;" onerror="this.onerror=null; this.src='${siteUrl}/logo.jpg';" />`;
+      const logoHtml = ``;
 
       if (status === 'accepted') {
         console.log("[Admin] Creating Google Calendar event...");
@@ -937,15 +936,23 @@ export default function Admin() {
               <h2 className="text-xl font-sans font-black uppercase mb-6 text-white">Réalisations ({gallery.length})</h2>
               <div className="space-y-4 flex-1 overflow-y-auto pr-2 custom-scrollbar">
                 {gallery.map(gal => (
-                  <div key={gal.id} className="bg-anthracite p-3 rounded border border-white/5 flex gap-4">
+                  <div key={gal.id} className="bg-anthracite p-3 rounded border border-white/5 flex gap-4 min-h-[80px]">
                     <div className="flex gap-1 h-16 w-32 shrink-0">
                       <img src={gal.beforeImg} className="w-1/2 h-full object-cover rounded-l" />
                       <img src={gal.afterImg} className="w-1/2 h-full object-cover rounded-r" />
                     </div>
-                    <div className="flex-1 flex justify-between items-center">
-                       <p className="text-[10px] text-white/40 font-mono italic truncate">{gal.afterDesc}</p>
-                       <div className="flex gap-2">
-                          <button onClick={() => deleteDetailingGallery(gal.id)} className="p-2 text-white/10 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                    <div className="flex-1 min-w-0 flex justify-between items-start gap-3">
+                       <p className="text-[10px] text-white/40 font-mono italic leading-relaxed break-words py-1 uppercase">{gal.afterDesc}</p>
+                       <div className="flex gap-1 shrink-0">
+                          <button 
+                            onClick={() => toggleDetailingFavorite(gal.id, !gal.isFavorite)} 
+                            className={`p-1.5 rounded transition-colors ${gal.isFavorite ? 'text-primary' : 'text-white/10 hover:text-white/30'}`}
+                          >
+                            <Star className={`w-4 h-4 ${gal.isFavorite ? 'fill-current' : ''}`} />
+                          </button>
+                          <button onClick={() => deleteDetailingGallery(gal.id)} className="p-1.5 text-white/10 hover:text-red-500 transition-colors">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                        </div>
                     </div>
                   </div>
