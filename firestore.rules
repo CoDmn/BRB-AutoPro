@@ -35,7 +35,6 @@ service cloud.firestore {
 
     function isValidContactRequest(data) {
       return data.keys().hasAll(['name', 'phone', 'email', 'subject', 'message', 'status', 'createdAt']) &&
-             data.keys().size() == 7 &&
              data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
              data.phone is string && data.phone.size() <= 20 &&
              data.email is string && data.email.size() > 0 && data.email.size() <= 100 &&
@@ -47,7 +46,6 @@ service cloud.firestore {
 
     function isValidImportRequest(data) {
       return data.keys().hasAll(['brand', 'model', 'year', 'budget', 'email', 'phone', 'options', 'status', 'createdAt']) &&
-             data.keys().size() == 9 &&
              data.brand is string && data.brand.size() <= 100 &&
              data.model is string && data.model.size() <= 100 &&
              data.year is string && data.year.size() <= 10 &&
@@ -61,7 +59,6 @@ service cloud.firestore {
 
     function isValidEstimationRequest(data) {
       return data.keys().hasAll(['brand', 'model', 'year', 'km', 'email', 'status', 'createdAt']) &&
-             data.keys().size() == 7 &&
              data.brand is string && data.brand.size() <= 100 &&
              data.model is string && data.model.size() <= 100 &&
              data.year is string && data.year.size() <= 10 &&
@@ -85,7 +82,7 @@ service cloud.firestore {
              data.img is string && data.img.size() <= 1048576 &&
              data.images is list && data.images.size() <= 10 &&
              (data.keys().hasAny(['details']) ? data.details is string && data.details.size() <= 20000 : true) &&
-             data.createdAt == request.time &&
+             (data.keys().hasAny(['isFavorite']) ? data.isFavorite is bool : true) &&
              data.updatedAt == request.time;
     }
 
@@ -96,7 +93,6 @@ service cloud.firestore {
              data.beforeDesc is string && data.beforeDesc.size() <= 5000 &&
              data.afterDesc is string && data.afterDesc.size() <= 5000 &&
              (data.keys().hasAny(['isFavorite']) ? data.isFavorite is bool : true) &&
-             data.createdAt == request.time &&
              data.updatedAt == request.time;
     }
 
@@ -123,38 +119,27 @@ service cloud.firestore {
     }
 
     match /contactRequests/{requestId} {
-      // Anyone can submit a contact request.
       allow create: if isValidId(requestId) && isValidContactRequest(incoming());
-      // Only admins can read, update, or delete.
-      allow read: if isAdmin() && isValidId(requestId);
-      allow list: if isAdmin();
-      allow delete: if isAdmin() && isValidId(requestId);
-      allow update: if isAdmin() && isValidId(requestId) &&
-                       incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']) &&
-                       (incoming().keys().hasAny(['status']) ? incoming().status in ['new', 'read', 'resolved'] : true) &&
-                       incoming().updatedAt == request.time;
+      allow read, list, delete: if isAdmin();
+      allow update: if isAdmin() && (
+        incoming().diff(existing()).affectedKeys().hasOnly(['status', 'isRead', 'isFavorite', 'updatedAt'])
+      );
     }
 
     match /importRequests/{requestId} {
       allow create: if isValidId(requestId) && isValidImportRequest(incoming());
-      allow read: if isAdmin() && isValidId(requestId);
-      allow list: if isAdmin();
-      allow delete: if isAdmin() && isValidId(requestId);
-      allow update: if isAdmin() && isValidId(requestId) &&
-                       incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']) &&
-                       (incoming().keys().hasAny(['status']) ? incoming().status in ['new', 'read', 'resolved'] : true) &&
-                       incoming().updatedAt == request.time;
+      allow read, list, delete: if isAdmin();
+      allow update: if isAdmin() && (
+        incoming().diff(existing()).affectedKeys().hasOnly(['status', 'isRead', 'isFavorite', 'updatedAt'])
+      );
     }
 
     match /estimationRequests/{requestId} {
       allow create: if isValidId(requestId) && isValidEstimationRequest(incoming());
-      allow read: if isAdmin() && isValidId(requestId);
-      allow list: if isAdmin();
-      allow delete: if isAdmin() && isValidId(requestId);
-      allow update: if isAdmin() && isValidId(requestId) &&
-                       incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']) &&
-                       (incoming().keys().hasAny(['status']) ? incoming().status in ['new', 'read', 'resolved'] : true) &&
-                       incoming().updatedAt == request.time;
+      allow read, list, delete: if isAdmin();
+      allow update: if isAdmin() && (
+        incoming().diff(existing()).affectedKeys().hasOnly(['status', 'isRead', 'isFavorite', 'updatedAt'])
+      );
     }
 
     match /inventory/{itemId} {

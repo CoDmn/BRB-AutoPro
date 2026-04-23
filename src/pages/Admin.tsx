@@ -13,11 +13,15 @@ import {
   updateDetailingGallery, 
   toggleDetailingFavorite,
   deleteDetailingGallery,
-  updateBookingStatus
+  updateBookingStatus,
+  toggleRequestReadStatus,
+  toggleRequestFavorite,
+  deleteRequest
 } from '../lib/firebaseUtils';
 import { compressImage } from '../lib/imageUtils';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { motion, AnimatePresence } from 'motion/react';
 
 export default function Admin() {
   const [user, setUser] = useState<User | null>(null);
@@ -43,6 +47,13 @@ export default function Admin() {
   const [newGallery, setNewGallery] = useState({ beforeImg: '', afterImg: '', beforeDesc: '', afterDesc: '' });
   const [editingCarId, setEditingCarId] = useState<string | null>(null);
   const [editingGalleryId, setEditingGalleryId] = useState<string | null>(null);
+
+  // Detail view states for requests
+  const [selectedRequest, setSelectedRequest] = useState<any | null>(null);
+  const [selectedRequestType, setSelectedRequestType] = useState<'contactRequests' | 'importRequests' | 'estimationRequests' | null>(null);
+  const [replyMessage, setReplyMessage] = useState('');
+  const [sendingReply, setSendingReply] = useState(false);
+
 
   const isAdminEmail = (email: string | null) => {
     return email === 'corentindamian@gmail.com' || email === 'brbautopro@gmail.com';
@@ -102,16 +113,19 @@ export default function Admin() {
     const token = localStorage.getItem('google_access_token');
     if (!token) return false;
 
-    const emailContent = [
-      'To: ' + to,
-      'Subject: ' + subject,
+    const utf8ToBase64 = (str: string) => btoa(unescape(encodeURIComponent(str)));
+    
+    const emailParts = [
+      `To: ${to}`,
+      `Subject: =?utf-8?B?${utf8ToBase64(subject)}?=`,
       'MIME-Version: 1.0',
       'Content-Type: text/html; charset=utf-8',
+      'Content-Transfer-Encoding: base64',
       '',
-      body
-    ].join('\n');
+      utf8ToBase64(body)
+    ];
 
-    const base64Content = btoa(unescape(encodeURIComponent(emailContent)))
+    const base64Content = btoa(emailParts.join('\r\n'))
       .replace(/\+/g, '-')
       .replace(/\//g, '_')
       .replace(/=+$/, '');
@@ -128,16 +142,28 @@ export default function Admin() {
       if (!response.ok) {
         const errorData = await response.json();
         console.error("Gmail API Error:", errorData);
+        
+        if (response.status === 403 && errorData.error?.message?.includes("disabled")) {
+          const projectMatch = errorData.error.message.match(/project (\d+)/);
+          const projectId = projectMatch ? projectMatch[1] : '';
+          const activationUrl = projectId 
+            ? `https://console.developers.google.com/apis/api/gmail.googleapis.com/overview?project=${projectId}`
+            : "https://console.developers.google.com/apis/api/gmail.googleapis.com/overview";
+          
+          throw new Error(`L'API Gmail est DÉSACTIVÉE. Vous devez l'activer ici : ${activationUrl}`);
+        }
+        
         if (response.status === 401) {
           localStorage.removeItem('google_access_token');
           setGoogleConnected(false);
+          throw new Error("Session Google expirée. Reconnectez-vous en haut à droite.");
         }
         return false;
       }
       return true;
-    } catch (error) {
-      console.error("Error sending email:", error);
-      return false;
+    } catch (error: any) {
+      console.error("Error in sendEmailViaGmail:", error);
+      throw error;
     }
   };
 
@@ -153,16 +179,17 @@ export default function Admin() {
       description: `Prestation: ${appointment.service}\nVéhicule: ${appointment.carModel}\nClient: ${appointment.firstName} ${appointment.lastName}\nEmail: ${appointment.email}\nTél: ${appointment.phone}\n\n--- Contact: 07 81 78 73 60`,
       start: { dateTime: startTime.toISOString() },
       end: { dateTime: endTime.toISOString() },
-      conferenceData: {
-        createRequest: {
-          requestId: Math.random().toString(36).substring(7),
-          conferenceSolutionKey: { type: 'hangoutsMeet' }
-        }
+      attendees: [
+        { email: appointment.email }
+      ],
+      reminders: {
+        useDefault: true
       }
     };
 
     try {
-      const response = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events?conferenceDataVersion=1', {
+      // Adding sendUpdates=all to trigger the email invitation from Google
+      const response = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events?sendUpdates=all', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -180,15 +207,28 @@ export default function Admin() {
       } else {
         const errorData = await response.json();
         console.error("Calendar API Error:", errorData);
+        
+        // Handle Disabled API error specific to the user's project
+        if (response.status === 403 && errorData.error?.message?.includes("disabled")) {
+          const projectMatch = errorData.error.message.match(/project (\d+)/);
+          const projectId = projectMatch ? projectMatch[1] : '';
+          const activationUrl = projectId 
+            ? `https://console.developers.google.com/apis/api/calendar-json.googleapis.com/overview?project=${projectId}`
+            : "https://console.developers.google.com/apis/api/calendar-json.googleapis.com/overview";
+          
+          throw new Error(`L'API Google Calendar est DÉSACTIVÉE. Vous devez l'activer ici : ${activationUrl}`);
+        }
+        
         if (response.status === 401) {
           localStorage.removeItem('google_access_token');
           setGoogleConnected(false);
+          throw new Error("Session Google expirée. Veuillez vous reconnecter en haut à droite.");
         }
         return null;
       }
-    } catch (error) {
-      console.error("Error creating Google Calendar event:", error);
-      return null;
+    } catch (error: any) {
+      console.error("Error in createGoogleCalendarEvent:", error);
+      throw error; // Rethrow to handle in handleUpdateBookingStatus
     }
   };
 
@@ -210,20 +250,72 @@ export default function Admin() {
     }
   };
 
+  const handleSelectRequest = (req: any, type: any) => {
+    setSelectedRequest(req);
+    setSelectedRequestType(type);
+    if (!req.isRead) {
+      toggleRequestReadStatus(type, req.id, true);
+    }
+  };
+
+  const handleReply = async () => {
+    if (!selectedRequest || !replyMessage.trim()) return;
+    setSendingReply(true);
+    try {
+      let subject = "Demande diverse BRB Auto Pro";
+      if (selectedRequestType === 'estimationRequests') subject = "Estimation automobile pour une demande d'estimation";
+      if (selectedRequestType === 'importRequests') subject = "Projet d'import automobile";
+
+      const signatureHtml = `
+        <br><br>
+        <p style="margin:0; font-weight: bold; color: #333;">Mathis - BRB Auto Pro</p>
+        <p style="margin:0; color: #666;">6 Chemin des Moulins, 30300 Beaucaire</p>
+        <p style="margin:0; color: #666;">Tél: 07 81 78 73 60</p>
+        <p style="margin:0; color: #666;">Site: <a href="https://brbautopro.fr">brbautopro.fr</a></p>
+        <img src="https://brbautopro.fr/logo.jpg" alt="BRB Auto Pro" style="width: 150px; height: auto; margin-top: 15px;" />
+      `;
+
+      const fullBody = `
+        <div style="font-family: sans-serif; color: #333; line-height: 1.6;">
+          <p>${replyMessage.replace(/\n/g, '<br>')}</p>
+          ${signatureHtml}
+        </div>
+      `;
+
+      await sendEmailViaGmail(selectedRequest.email, subject, fullBody);
+      alert("✅ Réponse envoyée avec succès !");
+      setReplyMessage('');
+      setSelectedRequest(null);
+    } catch (err: any) {
+      alert("❌ Erreur lors de l'envoi : " + err.message);
+    } finally {
+      setSendingReply(false);
+    }
+  };
+
   const handleUpdateBookingStatus = async (id: string, status: 'accepted' | 'refused' | 'cancelled') => {
+    console.log(`[Admin] handleUpdateBookingStatus - ID: ${id}, New Status: ${status}`);
     setProcessingId(id);
     try {
       const appointment = appointments.find(a => a.id === id);
+      console.log("[Admin] Found appointment state:", appointment);
+      
       if (!appointment) throw new Error("Rendez-vous non trouvé.");
 
       const dateStr = format(new Date(appointment.date), "dd/MM/yyyy", { locale: fr });
       const timeStr = format(new Date(appointment.date), "HH'h'mm", { locale: fr });
-      const logoHtml = '<img src="https://brbautopro.fr/logo.jpg" alt="BRB Auto Pro" style="width: 150px; height: auto; display: block; margin-top: 20px;" />';
+      
+      // Better logo handling with fallback to working demo URL if main logo fails
+      const logoUrl = "https://brbautopro.fr/logo.jpg";
+      const siteUrl = window.location.origin;
+      const logoHtml = `<img src="${logoUrl}" alt="BRB Auto Pro" style="width: 150px; height: auto; display: block; margin-top: 20px;" onerror="this.onerror=null; this.src='${siteUrl}/logo.jpg';" />`;
 
       if (status === 'accepted') {
+        console.log("[Admin] Creating Google Calendar event...");
         const eventData = await createGoogleCalendarEvent(appointment);
-        if (!eventData) throw new Error("Impossible de créer l'événement Google Calendar. Vérifiez votre connexion.");
+        if (!eventData) throw new Error("Impossible de créer l'événement Google Calendar (vide).");
 
+        console.log("[Admin] Event created. Saving ID to Firestore:", eventData.id);
         await updateBookingStatus(id, 'accepted', eventData.id);
 
         const emailBody = `
@@ -232,7 +324,7 @@ export default function Admin() {
             <p>Bonjour ${appointment.firstName},</p>
             <p>C'est confirmé ! Nous avons bien validé votre rendez-vous pour votre <strong>${appointment.carModel}</strong>.</p>
             <p><strong>Détails :</strong> ${appointment.service} à ${timeStr} le ${dateStr}.</p>
-            ${eventData.hangoutLink ? `<p>Lien de rendez-vous : <a href="${eventData.hangoutLink}">${eventData.hangoutLink}</a></p>` : ''}
+            <p>L'invitation a été ajoutée à votre agenda Google (vérifiez vos emails Google Calendar).</p>
             <p>Lieu: 6 Chemin des Moulins, 30300 Beaucaire.</p>
             <p>Merci de nous prévenir 24h à l'avance en cas d'empêchement.</p>
             <p>Cordialement,<br>Mathis - BRB Auto Pro</p>
@@ -240,9 +332,11 @@ export default function Admin() {
           </div>
         `.trim();
 
+        console.log("[Admin] Sending confirmation email...");
         const mailOk = await sendEmailViaGmail(appointment.email, `Confirmation de votre séance de Detailing - ${dateStr} 🏁`, emailBody);
-        alert(mailOk ? "✅ RDV Accepté, Agenda mis à jour et Email envoyé !" : "⚠️ RDV Accepté et Agenda OK, mais l'envoi de l'Email a échoué.");
+        alert(mailOk ? "✅ RDV Accepté, Invitation envoyée et Email envoyé !" : "⚠️ RDV Accepté et Agenda OK, mais l'envoi de l'Email a échoué.");
       } else if (status === 'refused') {
+        console.log("[Admin] Refusing appointment...");
         await updateBookingStatus(id, 'refused');
         const emailBody = `
           <div style="font-family: sans-serif; color: #333; line-height: 1.6;">
@@ -257,9 +351,12 @@ export default function Admin() {
         await sendEmailViaGmail(appointment.email, "À propos de votre demande de rendez-vous - BRB Auto Pro", emailBody);
         alert("Rendez-vous refusé et client notifié.");
       } else if (status === 'cancelled') {
+        console.log("[Admin] Cancelling appointment. Google Event ID:", appointment.googleEventId);
         if (appointment.googleEventId) {
+          console.log("[Admin] Deleting Google Calendar event:", appointment.googleEventId);
           await deleteGoogleCalendarEvent(appointment.googleEventId);
         }
+        console.log("[Admin] Updating Firestore status to cancelled...");
         await updateBookingStatus(id, 'cancelled');
         const emailBody = `
           <div style="font-family: sans-serif; color: #333; line-height: 1.6;">
@@ -271,6 +368,7 @@ export default function Admin() {
             ${logoHtml}
           </div>
         `.trim();
+        console.log("[Admin] Sending cancellation email...");
         await sendEmailViaGmail(appointment.email, `ANNULATION de votre rendez-vous - ${dateStr}`, emailBody);
         alert("✅ Rendez-vous annulé, supprimé de l'agenda et email envoyé.");
       }
@@ -548,44 +646,237 @@ export default function Admin() {
         )}
 
         {activeTab === 'requests' && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fade-in">
-            <div className="bg-darker rounded border border-white/10 p-6">
-              <h2 className="text-xl font-sans font-black uppercase mb-6 text-primary">Estimations ({estimationRequests.length})</h2>
-              <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
-                {estimationRequests.map(req => (
-                  <div key={req.id} className="bg-anthracite p-4 rounded border border-white/5">
-                    <div className="flex justify-between items-start mb-2"><h3 className="font-bold text-sm uppercase">{req.brand} {req.model}</h3><span className="text-[10px] uppercase font-bold bg-primary/20 text-primary px-2 py-1 rounded">{req.status}</span></div>
-                    <p className="text-xs text-white/50">{req.email} • {req.year} • {req.km}km</p>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fade-in pb-12">
+            {/* Estimations Section */}
+            <div className="bg-darker rounded border border-white/10 p-6 flex flex-col h-full">
+              <h2 className="text-xl font-sans font-black uppercase mb-6 text-primary flex items-center justify-between">
+                <span>Estimations ({estimationRequests.length})</span>
+                <span className="text-[10px] bg-primary/10 text-primary px-2 py-1 rounded">Vendeurs</span>
+              </h2>
+              <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar flex-1">
+                {estimationRequests
+                  .sort((a, b) => (b.isFavorite ? 1 : 0) - (a.isFavorite ? 1 : 0) || (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0))
+                  .map(req => (
+                  <div 
+                    key={req.id} 
+                    onClick={() => handleSelectRequest(req, 'estimationRequests')}
+                    className={`bg-anthracite p-4 rounded border cursor-pointer hover:border-primary/50 transition-all relative group ${req.isRead ? 'border-white/5 opacity-70' : 'border-primary/20 shadow-lg shadow-primary/5'}`}
+                  >
+                    {!req.isRead && <div className="absolute top-4 left-2 w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]"></div>}
+                    <div className="flex justify-between items-start mb-2 pl-3">
+                      <h3 className="font-black text-sm uppercase truncate pr-8">{req.brand} {req.model}</h3>
+                      <div className="flex items-center gap-1">
+                        <button onClick={(e) => { e.stopPropagation(); toggleRequestFavorite('estimationRequests', req.id, !req.isFavorite); }} className={`p-1 transition-colors ${req.isFavorite ? 'text-yellow-500' : 'text-white/10 group-hover:text-white/30'}`}>
+                          <Star className={`w-3 h-3 ${req.isFavorite ? 'fill-current' : ''}`} />
+                        </button>
+                        <button onClick={(e) => { e.stopPropagation(); if(confirm('Supprimer cette demande ?')) deleteRequest('estimationRequests', req.id); }} className="p-1 text-white/10 group-hover:text-red-500/50 hover:!text-red-500 transition-colors">
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="pl-3 space-y-1">
+                      <p className="text-[10px] text-white/50 font-mono truncate">{req.email}</p>
+                      <p className="text-[10px] text-primary font-black uppercase tracking-wider">{req.year} • {req.km} km {req.phone && `• ${req.phone}`}</p>
+                    </div>
                   </div>
                 ))}
               </div>
             </div>
-            <div className="bg-darker rounded border border-white/10 p-6">
-              <h2 className="text-xl font-sans font-black uppercase mb-6 text-primary">Imports ({importRequests.length})</h2>
-              <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
-                {importRequests.map(req => (
-                  <div key={req.id} className="bg-anthracite p-4 rounded border border-white/5">
-                    <div className="flex justify-between items-start mb-2"><h3 className="font-bold text-sm uppercase">{req.brand} {req.model}</h3><span className="text-[10px] uppercase font-bold bg-primary/20 text-primary px-2 py-1 rounded">{req.status}</span></div>
-                    <p className="text-xs text-white/70 mb-2">{req.email} • {req.budget}€</p>
-                    <p className="text-[10px] text-white/40 mt-1 italic line-clamp-2">Options: {req.options}</p>
+
+            {/* Imports Section */}
+            <div className="bg-darker rounded border border-white/10 p-6 flex flex-col h-full">
+              <h2 className="text-xl font-sans font-black uppercase mb-6 text-primary flex items-center justify-between">
+                <span>Imports ({importRequests.length})</span>
+                <span className="text-[10px] bg-primary/10 text-primary px-2 py-1 rounded">Acheteurs</span>
+              </h2>
+              <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar flex-1">
+                {importRequests
+                  .sort((a, b) => (b.isFavorite ? 1 : 0) - (a.isFavorite ? 1 : 0) || (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0))
+                  .map(req => (
+                  <div 
+                    key={req.id} 
+                    onClick={() => handleSelectRequest(req, 'importRequests')}
+                    className={`bg-anthracite p-4 rounded border cursor-pointer hover:border-primary/50 transition-all relative group ${req.isRead ? 'border-white/5 opacity-70' : 'border-primary/20 shadow-lg shadow-primary/5'}`}
+                  >
+                    {!req.isRead && <div className="absolute top-4 left-2 w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]"></div>}
+                    <div className="flex justify-between items-start mb-2 pl-3">
+                      <h3 className="font-black text-sm uppercase truncate pr-8">{req.brand} {req.model}</h3>
+                      <div className="flex items-center gap-1">
+                        <button onClick={(e) => { e.stopPropagation(); toggleRequestFavorite('importRequests', req.id, !req.isFavorite); }} className={`p-1 transition-colors ${req.isFavorite ? 'text-yellow-500' : 'text-white/10 group-hover:text-white/30'}`}>
+                          <Star className={`w-3 h-3 ${req.isFavorite ? 'fill-current' : ''}`} />
+                        </button>
+                        <button onClick={(e) => { e.stopPropagation(); if(confirm('Supprimer cette demande ?')) deleteRequest('importRequests', req.id); }} className="p-1 text-white/10 group-hover:text-red-500/50 hover:!text-red-500 transition-colors">
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="pl-3 space-y-1">
+                      <p className="text-[10px] text-white/50 font-mono truncate">{req.email}</p>
+                      <p className="text-[10px] text-primary font-black uppercase tracking-wider">{req.budget}€ Max {req.phone && `• ${req.phone}`}</p>
+                    </div>
                   </div>
                 ))}
               </div>
             </div>
+
+            {/* Contact Messages Section */}
             <div className="lg:col-span-2 bg-darker rounded border border-white/10 p-6">
-              <h2 className="text-xl font-sans font-black uppercase mb-6 text-primary">Contact Messages ({contactRequests.length})</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {contactRequests.map(req => (
-                  <div key={req.id} className="bg-anthracite p-4 rounded border border-white/5 h-fit">
-                    <div className="flex justify-between items-start mb-3"><h3 className="font-bold text-sm uppercase">{req.subject}</h3><span className="text-[9px] uppercase font-black bg-white/5 text-white/40 px-2 py-1 rounded">{format(req.createdAt?.toDate ? req.createdAt.toDate() : new Date(), "d MMM", { locale: fr })}</span></div>
-                    <p className="text-xs text-white/50 mb-3">{req.name} • {req.email}</p>
-                    <div className="p-3 bg-darker rounded text-sm text-white/80 leading-relaxed border border-white/5">{req.message}</div>
+              <h2 className="text-xl font-sans font-black uppercase mb-6 text-primary">Messages Contact ({contactRequests.length})</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {contactRequests
+                  .sort((a, b) => (b.isFavorite ? 1 : 0) - (a.isFavorite ? 1 : 0) || (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0))
+                  .map(req => (
+                  <div 
+                    key={req.id} 
+                    onClick={() => handleSelectRequest(req, 'contactRequests')}
+                    className={`bg-anthracite p-4 rounded border cursor-pointer hover:border-primary/50 transition-all relative group min-h-[140px] flex flex-col ${req.isRead ? 'border-white/5 opacity-70' : 'border-primary/20 shadow-lg shadow-primary/5'}`}
+                  >
+                    {!req.isRead && <div className="absolute top-4 left-2 w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]"></div>}
+                    <div className="flex justify-between items-start mb-2 pl-3">
+                      <h3 className="font-black text-xs uppercase truncate pr-6">{req.subject}</h3>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button onClick={(e) => { e.stopPropagation(); toggleRequestFavorite('contactRequests', req.id, !req.isFavorite); }} className={`p-1 transition-colors ${req.isFavorite ? 'text-yellow-500' : 'text-white/10 group-hover:text-white/30'}`}>
+                          <Star className={`w-3 h-3 ${req.isFavorite ? 'fill-current' : ''}`} />
+                        </button>
+                        <button onClick={(e) => { e.stopPropagation(); if(confirm('Supprimer ce message ?')) deleteRequest('contactRequests', req.id); }} className="p-1 text-white/10 group-hover:text-red-500/50 hover:!text-red-500 transition-colors">
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="pl-3 flex-1">
+                      <p className="text-[10px] text-white/80 font-bold mb-1">{req.name} • <span className="text-white/40 font-mono italic">{req.email}</span></p>
+                      <p className="text-[10px] text-white/50 line-clamp-3 leading-relaxed italic">"{req.message}"</p>
+                    </div>
+                    <div className="pl-3 mt-3 pt-2 border-t border-white/5 flex justify-between items-center">
+                      <span className="text-[8px] uppercase font-black text-white/20">{format(req.createdAt?.toDate ? req.createdAt.toDate() : new Date(), "d MMM yyyy", { locale: fr })}</span>
+                      <span className="text-[8px] uppercase font-black text-primary">Détails <ArrowLeft className="w-2 h-2 rotate-180 inline ml-1" /></span>
+                    </div>
                   </div>
                 ))}
               </div>
             </div>
           </div>
         )}
+
+        {/* Modal for Details View */}
+        <AnimatePresence>
+          {selectedRequest && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+              <motion.div 
+                initial={{ opacity: 0 }} 
+                animate={{ opacity: 1 }} 
+                exit={{ opacity: 0 }} 
+                onClick={() => setSelectedRequest(null)}
+                className="absolute inset-0 bg-black/80 backdrop-blur-sm" 
+              />
+              <motion.div 
+                initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                className="bg-darker border border-white/10 rounded-lg w-full max-w-4xl max-h-[90vh] overflow-hidden shadow-2xl relative z-10 flex flex-col md:flex-row"
+              >
+                {/* Left Side: Info */}
+                <div className="flex-1 p-6 md:p-8 overflow-y-auto border-b md:border-b-0 md:border-r border-white/10">
+                  <div className="flex justify-between items-start mb-6">
+                    <h2 className="text-2xl font-sans font-black uppercase text-white tracking-widest leading-none">
+                      {selectedRequestType === 'estimationRequests' ? 'Détails Estimation' : 
+                       selectedRequestType === 'importRequests' ? 'Détails Import' : 'Message Contact'}
+                    </h2>
+                    <button onClick={() => setSelectedRequest(null)} className="p-2 text-white/20 hover:text-white transition-colors">
+                      <X className="w-6 h-6" />
+                    </button>
+                  </div>
+
+                  <div className="space-y-6">
+                    <div className="bg-anthracite p-4 rounded border border-white/5 group relative">
+                      <p className="text-[10px] uppercase font-black text-white/30 mb-1">Informations Client</p>
+                      <p className="text-lg font-bold text-white mb-0.5">{selectedRequest.name || `${selectedRequest.firstName || ''} ${selectedRequest.lastName || ''}`}</p>
+                      <p className="text-sm font-mono text-primary mb-2">{selectedRequest.email}</p>
+                      {selectedRequest.phone && (
+                        <a href={`tel:${selectedRequest.phone}`} className="inline-flex items-center gap-2 bg-primary/10 text-primary hover:bg-primary/20 px-3 py-1.5 rounded transition-all transform hover:scale-105">
+                          <Globe className="w-4 h-4 rotate-12" />
+                          <span className="text-xs font-black uppercase tracking-widest">{selectedRequest.phone}</span>
+                        </a>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      {Object.entries(selectedRequest).map(([key, value]) => {
+                        if (['id', 'createdAt', 'isRead', 'isFavorite', 'status', 'name', 'firstName', 'lastName', 'email', 'phone'].includes(key)) return null;
+                        if (typeof value !== 'string' && typeof value !== 'number') return null;
+                        
+                        // Map labels
+                        const labels: Record<string, string> = {
+                          brand: 'Marque',
+                          model: 'Modèle',
+                          year: 'Année',
+                          km: 'Kilométrage',
+                          budget: 'Budget Max',
+                          options: 'Options souhaitées',
+                          message: 'Message',
+                          subject: 'Objet',
+                          fuel: 'Carburant',
+                          gearbox: 'Boîte'
+                        };
+
+                        return (
+                          <div key={key} className={key === 'message' || key === 'options' ? 'col-span-2' : ''}>
+                            <p className="text-[9px] uppercase font-black text-white/30 mb-0.5">{labels[key] || key}</p>
+                            <div className={`text-sm text-white/80 p-2 rounded bg-white/5 border border-white/5 ${key === 'message' || key === 'options' ? 'whitespace-pre-wrap leading-relaxed' : ''}`}>
+                              {value}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right Side: Reply */}
+                <div className="w-full md:w-[350px] bg-anthracite p-6 flex flex-col">
+                  <h3 className="text-xs font-black uppercase text-white/40 mb-4 tracking-widest flex items-center gap-2">
+                    <Mail className="w-4 h-4" /> Répondre par Email
+                  </h3>
+                  
+                  <div className="flex-1 flex flex-col gap-4">
+                    <textarea 
+                      placeholder="Tapez votre message ici..."
+                      value={replyMessage}
+                      onChange={(e) => setReplyMessage(e.target.value)}
+                      className="w-full flex-1 bg-darker border border-white/10 rounded p-4 text-sm text-white focus:border-primary transition-all resize-none placeholder:text-white/10"
+                    />
+                    
+                    <div className="space-y-4">
+                      <div className="p-3 rounded bg-white/5 border border-white/5">
+                        <p className="text-[8px] uppercase font-black text-white/20 mb-2">Signature Automatique</p>
+                        <div className="text-[10px] text-white/40 italic leading-snug">
+                          Mathis - BRB Auto Pro<br />
+                          07 81 78 73 60<br />
+                          brbautopro.fr
+                        </div>
+                      </div>
+
+                      <button 
+                        onClick={handleReply}
+                        disabled={!replyMessage.trim() || sendingReply}
+                        className="w-full bg-primary hover:bg-primary-hover disabled:opacity-50 disabled:grayscale transition-all py-3 rounded text-white font-black uppercase text-xs tracking-[0.2em] shadow-lg shadow-primary/20 flex items-center justify-center gap-2"
+                      >
+                        {sendingReply ? (
+                          <>
+                            <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            Envoi...
+                          </>
+                        ) : (
+                          <>Envoyer <CheckCircle2 className="w-3 h-3" /></>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
 
         {activeTab === 'inventory' && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fade-in">

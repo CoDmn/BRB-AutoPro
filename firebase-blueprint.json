@@ -11,6 +11,8 @@
         "subject": { "type": "string", "maxLength": 100 },
         "message": { "type": "string", "maxLength": 2000 },
         "status": { "type": "string", "enum": ["new", "read", "resolved"] },
+        "isRead": { "type": "boolean" },
+        "isFavorite": { "type": "boolean" },
         "createdAt": { "type": "timestamp" }
       },
       "required": ["name", "phone", "email", "subject", "message", "status", "createdAt"]
@@ -28,6 +30,8 @@
         "phone": { "type": "string", "maxLength": 20 },
         "options": { "type": "string", "maxLength": 1000 },
         "status": { "type": "string", "enum": ["new", "read", "resolved"] },
+        "isRead": { "type": "boolean" },
+        "isFavorite": { "type": "boolean" },
         "createdAt": { "type": "timestamp" }
       },
       "required": ["brand", "model", "year", "budget", "email", "phone", "options", "status", "createdAt"]
@@ -43,6 +47,8 @@
         "km": { "type": "string", "maxLength": 20 },
         "email": { "type": "string", "format": "email", "maxLength": 100 },
         "status": { "type": "string", "enum": ["new", "read", "resolved"] },
+        "isRead": { "type": "boolean" },
+        "isFavorite": { "type": "boolean" },
         "createdAt": { "type": "timestamp" }
       },
       "required": ["brand", "model", "year", "km", "email", "status", "createdAt"]

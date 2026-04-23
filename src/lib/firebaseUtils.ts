@@ -100,3 +100,17 @@ export async function updateBookingStatus(id: string, status: 'accepted' | 'refu
   
   await setDoc(ref, data, { merge: true });
 }
+
+export async function toggleRequestReadStatus(collectionName: string, id: string, isRead: boolean) {
+  const ref = doc(db, collectionName, id);
+  await setDoc(ref, { isRead, updatedAt: serverTimestamp() }, { merge: true });
+}
+
+export async function toggleRequestFavorite(collectionName: string, id: string, isFavorite: boolean) {
+  const ref = doc(db, collectionName, id);
+  await setDoc(ref, { isFavorite, updatedAt: serverTimestamp() }, { merge: true });
+}
+
+export async function deleteRequest(collectionName: string, id: string) {
+  await deleteDoc(doc(db, collectionName, id));
+}
